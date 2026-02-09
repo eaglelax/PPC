@@ -1,8 +1,7 @@
 import { Platform } from 'react-native';
 import { auth } from './firebase';
 
-// TODO: Replace with your actual Render URL after deployment
-const PROD_API_URL = 'https://ppc-api.onrender.com/api';
+const PROD_API_URL = 'https://ppc-7o2f.onrender.com/api';
 
 const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 const DEV_API_URL = `http://${DEV_HOST}:3001/api`;
