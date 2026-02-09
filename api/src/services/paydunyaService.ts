@@ -132,11 +132,11 @@ export async function completePayment(token: string) {
     throw new Error('Le montant PayDunya ne correspond pas.');
   }
 
-  // Mark as completed
-  await doc.ref.update({ status: 'completed', updatedAt: new Date() });
-
-  // Credit balance
+  // Credit balance first, then mark completed
   const result = await rechargeBalance(payment.userId, payment.amount);
+
+  // Only mark completed after balance is credited
+  await doc.ref.update({ status: 'completed', updatedAt: new Date() });
 
   return { alreadyProcessed: false, status: 'completed', ...result };
 }
