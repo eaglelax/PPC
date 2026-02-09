@@ -65,6 +65,7 @@ router.post('/ipn', async (req, res) => {
 });
 
 // GET /status/:token — Check payment status (auth required)
+// Also attempts to complete pending payments (fallback if IPN was missed)
 router.get('/status/:token', verifyToken, async (req: AuthRequest, res) => {
   try {
     const token = req.params.token as string;
@@ -73,6 +74,17 @@ router.get('/status/:token', verifyToken, async (req: AuthRequest, res) => {
     if (!payment) {
       res.status(404).json({ error: 'Paiement introuvable.' });
       return;
+    }
+
+    // If still pending, try to complete (in case IPN was missed)
+    if ((payment as any).status === 'pending') {
+      try {
+        const result = await completePayment(token);
+        res.json({ status: result.status });
+        return;
+      } catch {
+        // completePayment failed (e.g. PayDunya not yet completed), return current status
+      }
     }
 
     res.json({ status: (payment as any).status });
