@@ -3,10 +3,10 @@ import { auth } from './firebase';
 
 const PROD_API_URL = 'https://ppc-7o2f.onrender.com/api';
 
-const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+const DEV_HOST = Platform.OS === 'android' ? '192.168.11.228' : 'localhost';
 const DEV_API_URL = `http://${DEV_HOST}:3001/api`;
 
-export const API_BASE = __DEV__ ? DEV_API_URL : PROD_API_URL;
+export const API_BASE = PROD_API_URL; // Use Render API; revert to: __DEV__ ? DEV_API_URL : PROD_API_URL
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const user = auth.currentUser;
@@ -70,11 +70,7 @@ export function submitChoice(gameId: string, choice?: string) {
   return apiPost(`/games/${gameId}/choice`, { choice });
 }
 
-// PayDunya
-export function createPaydunyaInvoice(amount: number) {
-  return apiPost('/payments/paydunya/create-invoice', { amount });
-}
-
-export function checkPaydunyaStatus(token: string) {
-  return apiGet(`/payments/paydunya/status/${token}`);
+// Orange Money
+export function payWithOrangeMoney(amount: number, phone: string, otp: string) {
+  return apiPost('/orange-money/pay', { amount, phone, otp });
 }

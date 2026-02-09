@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,10 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
-import { createPaydunyaInvoice, checkPaydunyaStatus } from '../config/api';
+import { payWithOrangeMoney } from '../config/api';
 import { COLORS, FONTS, SPACING } from '../config/theme';
 import { RootStackParamList } from '../types';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
@@ -22,60 +21,34 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Recharge'>;
 };
 
-type Step = 'amount' | 'processing' | 'polling';
+type Step = 'amount' | 'details' | 'processing';
 
 export default function RechargeScreen({ navigation }: Props) {
   const { userData } = useAuth();
   const [amount, setAmount] = useState('');
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
   const [step, setStep] = useState<Step>('amount');
   const [loading, setLoading] = useState(false);
-  const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const numAmount = parseInt(amount, 10) || 0;
   const quickAmounts = [1000, 2000, 5000, 10000];
 
-  const stopPolling = useCallback(() => {
-    if (pollingRef.current) {
-      clearTimeout(pollingRef.current);
-      pollingRef.current = null;
-    }
-  }, []);
-
-  const pollStatus = useCallback(
-    (token: string, attempt: number = 0) => {
-      if (attempt >= 10) {
-        setStep('amount');
-        setLoading(false);
-        Alert.alert(
-          'Paiement en attente',
-          'Votre paiement est en cours de traitement. Votre solde sera mis a jour automatiquement.'
-        );
-        return;
-      }
-
-      pollingRef.current = setTimeout(async () => {
-        try {
-          const data = await checkPaydunyaStatus(token);
-          if (data.status === 'completed') {
-            setStep('amount');
-            setLoading(false);
-            Alert.alert('Recharge reussie !', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`, [
-              { text: 'OK', onPress: () => navigation.goBack() },
-            ]);
-          } else {
-            pollStatus(token, attempt + 1);
-          }
-        } catch {
-          pollStatus(token, attempt + 1);
-        }
-      }, 3000);
-    },
-    [numAmount, navigation]
-  );
-
-  const handlePay = async () => {
+  const handleContinue = () => {
     if (numAmount <= 0) {
       Alert.alert('Erreur', 'Veuillez entrer un montant valide.');
+      return;
+    }
+    setStep('details');
+  };
+
+  const handlePay = async () => {
+    if (phone.length < 8) {
+      Alert.alert('Erreur', 'Veuillez entrer un numero de telephone valide (8+ chiffres).');
+      return;
+    }
+    if (otp.length !== 4) {
+      Alert.alert('Erreur', 'Le code OTP doit contenir 4 chiffres.');
       return;
     }
 
@@ -83,25 +56,20 @@ export default function RechargeScreen({ navigation }: Props) {
     setStep('processing');
 
     try {
-      const { checkoutUrl, token } = await createPaydunyaInvoice(numAmount);
-
-      // Open PayDunya checkout page
-      await WebBrowser.openBrowserAsync(checkoutUrl);
-
-      // Browser closed — start polling for payment confirmation
-      setStep('polling');
-      pollStatus(token, 0);
-    } catch (error: any) {
+      await payWithOrangeMoney(numAmount, phone, otp);
       setStep('amount');
       setLoading(false);
-      Alert.alert('Erreur', error.message || 'Impossible de creer la facture.');
+      setAmount('');
+      setPhone('');
+      setOtp('');
+      Alert.alert('Recharge reussie !', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`, [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+    } catch (error: any) {
+      setStep('details');
+      setLoading(false);
+      Alert.alert('Erreur', error.message || 'Le paiement a echoue. Veuillez reessayer.');
     }
-  };
-
-  const handleCancel = () => {
-    stopPolling();
-    setStep('amount');
-    setLoading(false);
   };
 
   return (
@@ -161,34 +129,70 @@ export default function RechargeScreen({ navigation }: Props) {
             </View>
 
             <TouchableOpacity
-              style={[styles.button, (!numAmount || loading) && styles.buttonDisabled]}
-              onPress={handlePay}
-              disabled={!numAmount || loading}
+              style={[styles.button, !numAmount && styles.buttonDisabled]}
+              onPress={handleContinue}
+              disabled={!numAmount}
             >
-              <Text style={styles.buttonText}>
-                {loading ? 'Chargement...' : 'Payer avec PayDunya'}
+              <Text style={styles.buttonText}>Continuer</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {step === 'details' && (
+          <>
+            <View style={styles.amountBadge}>
+              <Text style={styles.amountBadgeText}>Montant : {numAmount.toLocaleString()}F</Text>
+              <TouchableOpacity onPress={() => setStep('amount')}>
+                <Text style={styles.changeLink}>Modifier</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.label}>Numero Orange Money</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ex: 77123456"
+              placeholderTextColor={COLORS.textSecondary}
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+            />
+
+            <Text style={styles.label}>Code OTP (4 chiffres)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ex: 1234"
+              placeholderTextColor={COLORS.textSecondary}
+              value={otp}
+              onChangeText={(text) => setOtp(text.replace(/[^0-9]/g, '').slice(0, 4))}
+              keyboardType="numeric"
+              maxLength={4}
+            />
+
+            <View style={styles.otpHint}>
+              <Ionicons name="information-circle-outline" size={16} color={COLORS.gold} />
+              <Text style={styles.otpHintText}>
+                Composez #144*82# pour obtenir votre code OTP Orange Money.
               </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.button, styles.omButton, (phone.length < 8 || otp.length !== 4) && styles.buttonDisabled]}
+              onPress={handlePay}
+              disabled={phone.length < 8 || otp.length !== 4}
+            >
+              <Ionicons name="phone-portrait-outline" size={20} color={COLORS.text} />
+              <Text style={styles.buttonText}>Payer avec Orange Money</Text>
             </TouchableOpacity>
           </>
         )}
 
         {step === 'processing' && (
           <View style={styles.processingContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text style={styles.processingText}>Ouverture de la page de paiement...</Text>
-          </View>
-        )}
-
-        {step === 'polling' && (
-          <View style={styles.processingContainer}>
             <ActivityIndicator size="large" color={COLORS.gold} />
-            <Text style={styles.processingText}>Verification du paiement en cours...</Text>
+            <Text style={styles.processingText}>Traitement du paiement en cours...</Text>
             <Text style={styles.processingSubtext}>
-              Votre solde sera mis a jour automatiquement.
+              Veuillez patienter, cela peut prendre quelques secondes.
             </Text>
-            <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-              <Text style={styles.cancelButtonText}>Annuler</Text>
-            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
@@ -309,6 +313,12 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     alignItems: 'center',
   },
+  omButton: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    justifyContent: 'center',
+    backgroundColor: '#FF6600',
+  },
   buttonDisabled: {
     opacity: 0.5,
   },
@@ -316,6 +326,41 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: FONTS.medium,
     fontWeight: 'bold',
+  },
+  amountBadge: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: SPACING.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  amountBadgeText: {
+    color: COLORS.text,
+    fontSize: FONTS.medium,
+    fontWeight: 'bold',
+  },
+  changeLink: {
+    color: COLORS.primary,
+    fontSize: FONTS.regular,
+    textDecorationLine: 'underline',
+  },
+  otpHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.surface,
+    borderRadius: 10,
+    padding: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  otpHintText: {
+    color: COLORS.gold,
+    fontSize: FONTS.small,
+    flex: 1,
   },
   processingContainer: {
     alignItems: 'center',
@@ -331,15 +376,5 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: FONTS.regular,
     textAlign: 'center',
-  },
-  cancelButton: {
-    marginTop: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-  },
-  cancelButtonText: {
-    color: COLORS.textSecondary,
-    fontSize: FONTS.regular,
-    textDecorationLine: 'underline',
   },
 });

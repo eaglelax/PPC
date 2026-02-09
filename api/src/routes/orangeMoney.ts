@@ -83,6 +83,7 @@ router.post('/pay', verifyToken, async (req: AuthRequest, res) => {
       });
       return;
     }
+    console.error('[Orange Money] Payment error:', error);
     res.status(400).json({ error: error.message });
   }
 });

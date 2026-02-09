@@ -34,8 +34,6 @@
       }
     },
     "owner": "axelnig",
-    "plugins": [
-      "expo-web-browser"
-    ]
+    "plugins": []
   }
 }

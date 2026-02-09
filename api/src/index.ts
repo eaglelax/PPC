@@ -9,7 +9,7 @@ import betRoutes from './routes/bets';
 import walletRoutes from './routes/wallet';
 import settingsRoutes from './routes/settings';
 import orangeMoneyRoutes from './routes/orangeMoney';
-import paydunyaRoutes from './routes/paydunya';
+// import paydunyaRoutes from './routes/paydunya'; // Replaced by Orange Money
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -28,7 +28,7 @@ app.use('/api/bets', betRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/orange-money', orangeMoneyRoutes);
-app.use('/api/payments/paydunya', paydunyaRoutes);
+// app.use('/api/payments/paydunya', paydunyaRoutes); // Replaced by Orange Money
 
 // Health check
 app.get('/api/health', (_req, res) => {
