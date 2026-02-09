@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+web-build/
+
+# Expo
+.expo/
+expo-env.d.ts
+
+# Native (generated)
+mobile/ios/
+mobile/android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+.kotlin/
+
+# Debug logs
+firebase-debug.log
+firestore-debug.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Environment / secrets
+.env
+.env.*
+*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+
+# Metro
+.metro-health-check*
+
+# Archives
+*.zip
+
+# Claude Code local settings
+.claude/
+
+# Misc
+image.png

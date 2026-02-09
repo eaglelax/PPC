@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "waiting_room",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "betAmount", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "transactions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
