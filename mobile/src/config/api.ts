@@ -69,3 +69,12 @@ export function getGameById(gameId: string) {
 export function submitChoice(gameId: string, choice?: string) {
   return apiPost(`/games/${gameId}/choice`, { choice });
 }
+
+// PayDunya
+export function createPaydunyaInvoice(amount: number) {
+  return apiPost('/payments/paydunya/create-invoice', { amount });
+}
+
+export function checkPaydunyaStatus(token: string) {
+  return apiGet(`/payments/paydunya/status/${token}`);
+}

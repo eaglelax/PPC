@@ -40,6 +40,11 @@ service cloud.firestore {
       allow read: if request.auth != null;
     }
 
+    // Payments: owner can read their own payments
+    match /payments/{paymentId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
     // Settings: anyone can read
     match /settings/{settingId} {
       allow read: if true;

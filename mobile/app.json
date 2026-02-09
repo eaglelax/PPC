@@ -27,6 +27,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "059f80db-2ae7-4aed-b05b-d177076b279f"
+      }
+    },
+    "owner": "axelnig",
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }

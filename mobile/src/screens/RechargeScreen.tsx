@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,13 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
-import { rechargeBalance } from '../services/transactionService';
+import { createPaydunyaInvoice, checkPaydunyaStatus } from '../config/api';
 import { COLORS, FONTS, SPACING } from '../config/theme';
 import { RootStackParamList } from '../types';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
@@ -20,214 +22,178 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Recharge'>;
 };
 
-type PaymentMethod = 'Orange' | 'MTN' | 'Moov';
-
-const PAYMENT_METHODS: { key: PaymentMethod; label: string; color: string }[] = [
-  { key: 'Orange', label: 'Orange Money', color: '#FF6600' },
-  { key: 'MTN', label: 'MTN MoMo', color: '#FFCC00' },
-  { key: 'Moov', label: 'Moov Money', color: '#0066CC' },
-];
+type Step = 'amount' | 'processing' | 'polling';
 
 export default function RechargeScreen({ navigation }: Props) {
-  const { firebaseUser, userData } = useAuth();
+  const { userData } = useAuth();
   const [amount, setAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
-  const [phone, setPhone] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState('');
+  const [step, setStep] = useState<Step>('amount');
   const [loading, setLoading] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const numAmount = parseInt(amount, 10) || 0;
-
   const quickAmounts = [1000, 2000, 5000, 10000];
 
-  const handleSendOtp = () => {
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearTimeout(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  const pollStatus = useCallback(
+    (token: string, attempt: number = 0) => {
+      if (attempt >= 10) {
+        setStep('amount');
+        setLoading(false);
+        Alert.alert(
+          'Paiement en attente',
+          'Votre paiement est en cours de traitement. Votre solde sera mis a jour automatiquement.'
+        );
+        return;
+      }
+
+      pollingRef.current = setTimeout(async () => {
+        try {
+          const data = await checkPaydunyaStatus(token);
+          if (data.status === 'completed') {
+            setStep('amount');
+            setLoading(false);
+            Alert.alert('Recharge reussie !', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`, [
+              { text: 'OK', onPress: () => navigation.goBack() },
+            ]);
+          } else {
+            pollStatus(token, attempt + 1);
+          }
+        } catch {
+          pollStatus(token, attempt + 1);
+        }
+      }, 3000);
+    },
+    [numAmount, navigation]
+  );
+
+  const handlePay = async () => {
     if (numAmount <= 0) {
       Alert.alert('Erreur', 'Veuillez entrer un montant valide.');
       return;
     }
-    if (!paymentMethod) {
-      Alert.alert('Erreur', 'Veuillez choisir une methode de paiement.');
-      return;
+
+    setLoading(true);
+    setStep('processing');
+
+    try {
+      const { checkoutUrl, token } = await createPaydunyaInvoice(numAmount);
+
+      // Open PayDunya checkout page
+      await WebBrowser.openBrowserAsync(checkoutUrl);
+
+      // Browser closed — start polling for payment confirmation
+      setStep('polling');
+      pollStatus(token, 0);
+    } catch (error: any) {
+      setStep('amount');
+      setLoading(false);
+      Alert.alert('Erreur', error.message || 'Impossible de creer la facture.');
     }
-    if (!phone || phone.length < 8) {
-      Alert.alert('Erreur', 'Veuillez entrer un numero de telephone valide.');
-      return;
-    }
-    // Simulate OTP sending
-    setOtpSent(true);
-    Alert.alert('OTP envoye', `Un code a 4 chiffres a ete envoye au ${phone}.`);
   };
 
-  const handleConfirmRecharge = async () => {
-    if (!firebaseUser || !userData) return;
-    if (otp.length !== 4) {
-      Alert.alert('Erreur', 'Veuillez entrer un code OTP a 4 chiffres.');
-      return;
-    }
-
-    // Simulated OTP validation: accept any 4-digit code
-    setLoading(true);
-    try {
-      await rechargeBalance(firebaseUser.uid, userData.balance, numAmount);
-      Alert.alert(
-        'Recharge reussie !',
-        `+${numAmount.toLocaleString()}F ajoutes via ${paymentMethod}`,
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
-    } catch {
-      Alert.alert('Erreur', 'La recharge a echoue. Reessayez.');
-    } finally {
-      setLoading(false);
-    }
+  const handleCancel = () => {
+    stopPolling();
+    setStep('amount');
+    setLoading(false);
   };
 
   return (
     <View style={styles.wrapper}>
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Recharger</Text>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <Text style={styles.title}>Recharger</Text>
 
-      <View style={styles.currentBalance}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Ionicons name="wallet-outline" size={18} color={COLORS.textSecondary} />
-          <Text style={styles.balanceLabel}>Solde actuel</Text>
+        <View style={styles.currentBalance}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="wallet-outline" size={18} color={COLORS.textSecondary} />
+            <Text style={styles.balanceLabel}>Solde actuel</Text>
+          </View>
+          <Text style={styles.balanceValue}>{userData?.balance.toLocaleString()}F</Text>
         </View>
-        <Text style={styles.balanceValue}>{userData?.balance.toLocaleString()}F</Text>
-      </View>
 
-      {!otpSent ? (
-        <>
-          {/* Step 1: Amount + method + phone */}
-          <Text style={styles.label}>Montant de la recharge</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Entrez le montant"
-            placeholderTextColor={COLORS.textSecondary}
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="numeric"
-          />
+        {step === 'amount' && (
+          <>
+            <Text style={styles.label}>Montant de la recharge</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Entrez le montant"
+              placeholderTextColor={COLORS.textSecondary}
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="numeric"
+            />
 
-          <View style={styles.quickRow}>
-            {quickAmounts.map((q) => (
-              <TouchableOpacity
-                key={q}
-                style={[styles.quickBtn, amount === String(q) && styles.quickBtnActive]}
-                onPress={() => setAmount(String(q))}
-              >
-                <Text style={[styles.quickText, amount === String(q) && styles.quickTextActive]}>
-                  {q.toLocaleString()}F
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Text style={styles.label}>Methode de paiement</Text>
-          <View style={styles.methodsRow}>
-            {PAYMENT_METHODS.map((m) => (
-              <TouchableOpacity
-                key={m.key}
-                style={[
-                  styles.methodBtn,
-                  paymentMethod === m.key && { borderColor: m.color, borderWidth: 2 },
-                ]}
-                onPress={() => setPaymentMethod(m.key)}
-              >
-                <Text
-                  style={[
-                    styles.methodText,
-                    paymentMethod === m.key && { color: m.color, fontWeight: 'bold' },
-                  ]}
+            <View style={styles.quickRow}>
+              {quickAmounts.map((q) => (
+                <TouchableOpacity
+                  key={q}
+                  style={[styles.quickBtn, amount === String(q) && styles.quickBtnActive]}
+                  onPress={() => setAmount(String(q))}
                 >
-                  {m.label}
+                  <Text style={[styles.quickText, amount === String(q) && styles.quickTextActive]}>
+                    {q.toLocaleString()}F
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.summary}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Montant</Text>
+                <Text style={styles.summaryValue}>{numAmount.toLocaleString()}F</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Frais</Text>
+                <Text style={[styles.summaryValue, { color: COLORS.success }]}>0F</Text>
+              </View>
+              <View style={[styles.summaryRow, styles.summaryTotal]}>
+                <Text style={[styles.summaryLabel, { fontWeight: 'bold' }]}>Credit net</Text>
+                <Text style={[styles.summaryValue, { color: COLORS.success, fontWeight: 'bold' }]}>
+                  +{numAmount.toLocaleString()}F
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Text style={styles.label}>Numero de telephone</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: 07XXXXXXXX"
-            placeholderTextColor={COLORS.textSecondary}
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-          />
-
-          <View style={styles.summary}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Montant</Text>
-              <Text style={styles.summaryValue}>{numAmount.toLocaleString()}F</Text>
+              </View>
             </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Frais</Text>
-              <Text style={[styles.summaryValue, { color: COLORS.success }]}>0F</Text>
-            </View>
-            <View style={[styles.summaryRow, styles.summaryTotal]}>
-              <Text style={[styles.summaryLabel, { fontWeight: 'bold' }]}>Credit net</Text>
-              <Text style={[styles.summaryValue, { color: COLORS.success, fontWeight: 'bold' }]}>
-                +{numAmount.toLocaleString()}F
+
+            <TouchableOpacity
+              style={[styles.button, (!numAmount || loading) && styles.buttonDisabled]}
+              onPress={handlePay}
+              disabled={!numAmount || loading}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? 'Chargement...' : 'Payer avec PayDunya'}
               </Text>
-            </View>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {step === 'processing' && (
+          <View style={styles.processingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.processingText}>Ouverture de la page de paiement...</Text>
           </View>
+        )}
 
-          <TouchableOpacity
-            style={[
-              styles.button,
-              (!numAmount || !paymentMethod || !phone) && styles.buttonDisabled,
-            ]}
-            onPress={handleSendOtp}
-            disabled={!numAmount || !paymentMethod || !phone}
-          >
-            <Text style={styles.buttonText}>Generer OTP</Text>
-          </TouchableOpacity>
-        </>
-      ) : (
-        <>
-          {/* Step 2: OTP confirmation */}
-          <View style={styles.otpSummary}>
-            <Text style={styles.otpSummaryText}>
-              {numAmount.toLocaleString()}F via {paymentMethod}
+        {step === 'polling' && (
+          <View style={styles.processingContainer}>
+            <ActivityIndicator size="large" color={COLORS.gold} />
+            <Text style={styles.processingText}>Verification du paiement en cours...</Text>
+            <Text style={styles.processingSubtext}>
+              Votre solde sera mis a jour automatiquement.
             </Text>
-            <Text style={styles.otpSummaryPhone}>{phone}</Text>
+            <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+              <Text style={styles.cancelButtonText}>Annuler</Text>
+            </TouchableOpacity>
           </View>
+        )}
+      </ScrollView>
 
-          <Text style={styles.label}>Code OTP (4 chiffres)</Text>
-          <TextInput
-            style={styles.otpInput}
-            placeholder="_ _ _ _"
-            placeholderTextColor={COLORS.textSecondary}
-            value={otp}
-            onChangeText={(text) => setOtp(text.replace(/[^0-9]/g, '').slice(0, 4))}
-            keyboardType="numeric"
-            maxLength={4}
-          />
-
-          <TouchableOpacity
-            style={[styles.button, (loading || otp.length !== 4) && styles.buttonDisabled]}
-            onPress={handleConfirmRecharge}
-            disabled={loading || otp.length !== 4}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? 'Traitement...' : 'Confirmer la recharge'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => {
-              setOtpSent(false);
-              setOtp('');
-            }}
-          >
-            <Text style={styles.backButtonText}>Modifier les informations</Text>
-          </TouchableOpacity>
-        </>
-      )}
-    </ScrollView>
-
-    <Navbar active="Recharge" />
+      <Navbar active="Recharge" />
     </View>
   );
 }
@@ -312,22 +278,6 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: 'bold',
   },
-  methodsRow: {
-    gap: SPACING.sm,
-    marginBottom: SPACING.lg,
-  },
-  methodBtn: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: SPACING.md,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  methodText: {
-    color: COLORS.textSecondary,
-    fontSize: FONTS.regular,
-  },
   summary: {
     backgroundColor: COLORS.surface,
     borderRadius: 12,
@@ -367,42 +317,27 @@ const styles = StyleSheet.create({
     fontSize: FONTS.medium,
     fontWeight: 'bold',
   },
-  otpSummary: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: SPACING.lg,
+  processingContainer: {
     alignItems: 'center',
-    marginBottom: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
+    paddingVertical: SPACING.xxl,
+    gap: SPACING.md,
   },
-  otpSummaryText: {
-    color: COLORS.gold,
-    fontSize: FONTS.large,
-    fontWeight: 'bold',
+  processingText: {
+    color: COLORS.text,
+    fontSize: FONTS.medium,
+    textAlign: 'center',
   },
-  otpSummaryPhone: {
+  processingSubtext: {
     color: COLORS.textSecondary,
     fontSize: FONTS.regular,
-    marginTop: SPACING.xs,
-  },
-  otpInput: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: SPACING.lg,
-    fontSize: FONTS.xlarge,
-    color: COLORS.text,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
     textAlign: 'center',
-    letterSpacing: 12,
-    marginBottom: SPACING.lg,
   },
-  backButton: {
-    marginTop: SPACING.md,
-    alignItems: 'center',
+  cancelButton: {
+    marginTop: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
   },
-  backButtonText: {
+  cancelButtonText: {
     color: COLORS.textSecondary,
     fontSize: FONTS.regular,
     textDecorationLine: 'underline',
