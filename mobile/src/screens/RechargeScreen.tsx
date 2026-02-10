@@ -8,6 +8,7 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -46,7 +47,7 @@ export default function RechargeScreen({ navigation }: Props) {
     setStep('details');
   };
 
-  const handlePay = async () => {
+  const handlePay = () => {
     if (phone.length < 8) {
       Alert.alert('Erreur', 'Veuillez entrer un numero de telephone valide (8+ chiffres).');
       return;
@@ -56,6 +57,23 @@ export default function RechargeScreen({ navigation }: Props) {
       return;
     }
 
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Confirmer la recharge de ${numAmount.toLocaleString()}F via Orange Money ?`)) {
+        processRecharge();
+      }
+    } else {
+      Alert.alert(
+        'Confirmer la recharge',
+        `Recharger ${numAmount.toLocaleString()}F via Orange Money ?`,
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Confirmer', onPress: () => processRecharge() },
+        ]
+      );
+    }
+  };
+
+  const processRecharge = async () => {
     setLoading(true);
     setStep('processing');
 
@@ -66,9 +84,11 @@ export default function RechargeScreen({ navigation }: Props) {
       setAmount('');
       setPhone('');
       setOtp('');
-      Alert.alert('Recharge reussie !', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`, [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      if (Platform.OS === 'web') {
+        window.alert(`Recharge reussie ! +${numAmount.toLocaleString()}F ajoutes a votre solde.`);
+      } else {
+        Alert.alert('Recharge reussie !', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`);
+      }
     } catch (error: any) {
       setStep('details');
       setLoading(false);

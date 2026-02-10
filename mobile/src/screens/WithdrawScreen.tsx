@@ -8,6 +8,7 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -50,7 +51,7 @@ export default function WithdrawScreen({ navigation }: Props) {
       .finally(() => setLoadingFee(false));
   }, []);
 
-  const handleWithdraw = async () => {
+  const handleWithdraw = () => {
     if (!userData) return;
     if (numAmount <= 0) {
       Alert.alert('Erreur', 'Veuillez entrer un montant valide.');
@@ -73,14 +74,37 @@ export default function WithdrawScreen({ navigation }: Props) {
       return;
     }
 
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Confirmer le retrait de ${numAmount.toLocaleString()}F via ${method} ?\nVous recevrez ${netAmount.toLocaleString()}F (frais ${fee.toLocaleString()}F)`)) {
+        processWithdraw();
+      }
+    } else {
+      Alert.alert(
+        'Confirmer le retrait',
+        `Retirer ${numAmount.toLocaleString()}F via ${method} ?\nVous recevrez ${netAmount.toLocaleString()}F (frais ${fee.toLocaleString()}F)`,
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Confirmer', onPress: () => processWithdraw() },
+        ]
+      );
+    }
+  };
+
+  const processWithdraw = async () => {
     setLoading(true);
     try {
-      const result = await withdrawFunds(numAmount, method, phone);
-      Alert.alert(
-        'Retrait effectue',
-        `${result.netAmount.toLocaleString()}F envoyes sur ${method} (${phone})\nFrais: ${result.fee.toLocaleString()}F`,
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
+      const result = await withdrawFunds(numAmount, method!, phone);
+      if (Platform.OS === 'web') {
+        window.alert(`Retrait effectue ! ${result.netAmount.toLocaleString()}F envoyes sur ${method} (${phone})\nFrais: ${result.fee.toLocaleString()}F`);
+      } else {
+        Alert.alert(
+          'Retrait effectue',
+          `${result.netAmount.toLocaleString()}F envoyes sur ${method} (${phone})\nFrais: ${result.fee.toLocaleString()}F`
+        );
+      }
+      setAmount('');
+      setMethod(null);
+      setPhone('');
     } catch (error: any) {
       Alert.alert('Erreur', error.message);
     } finally {
