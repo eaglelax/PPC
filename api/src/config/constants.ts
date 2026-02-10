@@ -9,6 +9,6 @@ export const MIN_RECHARGE = 1010;
 
 export type BetAmount = (typeof BET_AMOUNTS)[number];
 export type Choice = 'pierre' | 'papier' | 'ciseaux';
-export type GameStatus = 'choosing' | 'resolved' | 'draw';
+export type GameStatus = 'choosing' | 'resolved' | 'draw' | 'cancelled';
 export type BetStatus = 'waiting' | 'matched' | 'cancelled';
 export type TransactionType = 'recharge' | 'win' | 'loss' | 'bet' | 'refund' | 'withdrawal';

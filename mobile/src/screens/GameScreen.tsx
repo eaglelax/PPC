@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
-import { onGameUpdate, getRandomChoice } from '../services/gameService';
-import { submitChoice } from '../config/api';
+import { onGameUpdate } from '../services/gameService';
+import { submitChoice, submitTimeout, cancelStaleGame } from '../config/api';
 import { COLORS, FONTS, SPACING, CHOICE_TIMER } from '../config/theme';
 import { RootStackParamList, Choice, Game } from '../types';
 
@@ -58,9 +58,32 @@ export default function GameScreen({ navigation, route }: Props) {
       if (g?.status === 'resolved') {
         navigation.replace('Result', { gameId });
       }
+
+      if (g?.status === 'cancelled') {
+        Alert.alert(
+          'Partie annulee',
+          'La partie a ete annulee pour inactivite. Vos fonds ont ete rembourses.',
+          [{ text: 'OK', onPress: () => navigation.replace('Home') }]
+        );
+      }
     });
     return unsub;
   }, [gameId, navigation, showDraw]);
+
+  // Detect stale game (choosing for > 2 minutes)
+  useEffect(() => {
+    if (!game || game.status !== 'choosing' || !game.choosingStartedAt) return;
+
+    const choosingTime = (game.choosingStartedAt as any)?.toDate?.()
+      || new Date(game.choosingStartedAt);
+    const elapsed = Date.now() - choosingTime.getTime();
+
+    if (elapsed >= 2 * 60 * 1000) {
+      cancelStaleGame(gameId).catch(() => {
+        // May already be cancelled or not stale enough
+      });
+    }
+  }, [game?.status, game?.choosingStartedAt, gameId]);
 
   const handleChoice = useCallback(async (choice: Choice) => {
     if (hasChosenRef.current || !firebaseUser) return;
@@ -88,8 +111,12 @@ export default function GameScreen({ navigation, route }: Props) {
       setTimer((prev) => {
         if (prev <= 1) {
           if (!hasChosenRef.current && firebaseUser) {
-            const randomChoice = getRandomChoice();
-            handleChoice(randomChoice);
+            hasChosenRef.current = true;
+            setHasChosen(true);
+            submitTimeout(gameId).catch(() => {
+              hasChosenRef.current = false;
+              setHasChosen(false);
+            });
           }
           return 0;
         }
@@ -100,7 +127,7 @@ export default function GameScreen({ navigation, route }: Props) {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [hasChosen, game?.status, game?.round, firebaseUser, handleChoice]);
+  }, [hasChosen, game?.status, game?.round, firebaseUser, gameId]);
 
   const animatePress = (index: number) => {
     Animated.sequence([

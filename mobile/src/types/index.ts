@@ -27,9 +27,11 @@ export interface Game {
   player1: PlayerState;
   player2: PlayerState;
   betAmount: number;
-  status: 'choosing' | 'resolved' | 'draw';
+  status: 'choosing' | 'resolved' | 'draw' | 'cancelled';
   winner: string | null;
   round: number;
+  timeoutCount: number;
+  choosingStartedAt: Date;
   createdAt: Date;
 }
 

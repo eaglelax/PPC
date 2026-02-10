@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { AuthRequest, verifyToken } from '../middleware/auth';
-import { getGame, makeChoice, getRandomChoice } from '../services/gameService';
+import { getGame, makeChoice, handleTimeout, cancelStaleGame } from '../services/gameService';
 import { Choice } from '../config/constants';
 
 const router = Router();
@@ -24,11 +24,11 @@ router.get('/:id', verifyToken, async (req: AuthRequest, res) => {
 // POST /api/games/:id/choice
 router.post('/:id/choice', verifyToken, async (req: AuthRequest, res) => {
   try {
-    let { choice } = req.body;
+    const { choice } = req.body;
 
-    // If no choice (timeout), pick random
     if (!choice) {
-      choice = getRandomChoice();
+      res.status(400).json({ error: 'Choix requis.' });
+      return;
     }
 
     if (!VALID_CHOICES.includes(choice)) {
@@ -37,6 +37,26 @@ router.post('/:id/choice', verifyToken, async (req: AuthRequest, res) => {
     }
 
     const result = await makeChoice(req.params.id as string, req.uid!, choice);
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// POST /api/games/:id/timeout
+router.post('/:id/timeout', verifyToken, async (req: AuthRequest, res) => {
+  try {
+    const result = await handleTimeout(req.params.id as string, req.uid!);
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// POST /api/games/:id/cancel-stale
+router.post('/:id/cancel-stale', verifyToken, async (req: AuthRequest, res) => {
+  try {
+    const result = await cancelStaleGame(req.params.id as string, req.uid!);
     res.json({ success: true, ...result });
   } catch (error: any) {
     res.status(400).json({ error: error.message });

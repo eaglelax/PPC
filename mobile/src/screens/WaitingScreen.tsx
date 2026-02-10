@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert, AppState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -19,6 +19,8 @@ export default function WaitingScreen({ navigation, route }: Props) {
   const [dots, setDots] = useState('');
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [cancelling, setCancelling] = useState(false);
+  const matchedRef = useRef(false);
+  const cancellingRef = useRef(false);
 
   // Pulse animation
   useEffect(() => {
@@ -46,6 +48,7 @@ export default function WaitingScreen({ navigation, route }: Props) {
 
     const unsub = onBetUpdate(betId, (bet) => {
       if (bet && bet.status === 'matched' && bet.gameId) {
+        matchedRef.current = true;
         navigation.replace('Game', { gameId: bet.gameId });
       }
     });
@@ -53,17 +56,32 @@ export default function WaitingScreen({ navigation, route }: Props) {
     return unsub;
   }, [betId, navigation]);
 
-  const handleCancel = async () => {
+  // Auto-cancel bet when navigating away (unless matched)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (matchedRef.current || cancellingRef.current) return;
+      cancellingRef.current = true;
+      cancelBet(betId).catch(() => {});
+    });
+    return unsubscribe;
+  }, [navigation, betId]);
+
+  // Auto-cancel bet when app goes to background
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'background' && !matchedRef.current && !cancellingRef.current) {
+        cancellingRef.current = true;
+        cancelBet(betId).catch(() => {});
+        navigation.goBack();
+      }
+    });
+    return () => subscription.remove();
+  }, [betId, navigation]);
+
+  const handleCancel = () => {
     if (!firebaseUser || cancelling) return;
     setCancelling(true);
-
-    try {
-      await cancelBet(betId);
-      navigation.goBack();
-    } catch (error: any) {
-      Alert.alert('Erreur', error.message);
-      setCancelling(false);
-    }
+    navigation.goBack();
   };
 
   return (

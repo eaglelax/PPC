@@ -66,8 +66,16 @@ export function getGameById(gameId: string) {
   return apiGet(`/games/${gameId}`);
 }
 
-export function submitChoice(gameId: string, choice?: string) {
+export function submitChoice(gameId: string, choice: string) {
   return apiPost(`/games/${gameId}/choice`, { choice });
+}
+
+export function submitTimeout(gameId: string) {
+  return apiPost(`/games/${gameId}/timeout`);
+}
+
+export function cancelStaleGame(gameId: string) {
+  return apiPost(`/games/${gameId}/cancel-stale`);
 }
 
 // Orange Money
