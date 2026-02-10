@@ -9,6 +9,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -17,6 +19,7 @@ import { payWithOrangeMoney } from '../config/api';
 import { COLORS, FONTS, SPACING, MIN_RECHARGE } from '../config/theme';
 import { RootStackParamList } from '../types';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
+import { ORANGE_MONEY_COUNTRIES, DEFAULT_COUNTRY, Country } from '../config/countries';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Recharge'>;
@@ -29,6 +32,8 @@ export default function RechargeScreen({ navigation }: Props) {
   const [amount, setAmount] = useState('');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
+  const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
+  const [countryPickerVisible, setCountryPickerVisible] = useState(false);
   const [step, setStep] = useState<Step>('amount');
   const [loading, setLoading] = useState(false);
 
@@ -76,9 +81,10 @@ export default function RechargeScreen({ navigation }: Props) {
   const processRecharge = async () => {
     setLoading(true);
     setStep('processing');
+    const fullPhone = country.dialCode + phone;
 
     try {
-      await payWithOrangeMoney(numAmount, phone, otp);
+      await payWithOrangeMoney(numAmount, fullPhone, otp);
       setStep('amount');
       setLoading(false);
       setAmount('');
@@ -172,14 +178,24 @@ export default function RechargeScreen({ navigation }: Props) {
             </View>
 
             <Text style={styles.label}>Numero Orange Money</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: 77123456"
-              placeholderTextColor={COLORS.textSecondary}
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-            />
+            <View style={styles.phoneRow}>
+              <TouchableOpacity
+                style={styles.countrySelector}
+                onPress={() => setCountryPickerVisible(true)}
+              >
+                <Text style={styles.countryFlag}>{country.flag}</Text>
+                <Text style={styles.countryDialCode}>{country.dialCode}</Text>
+                <Ionicons name="chevron-down" size={14} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+              <TextInput
+                style={styles.phoneInput}
+                placeholder="77123456"
+                placeholderTextColor={COLORS.textSecondary}
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+              />
+            </View>
 
             <Text style={styles.label}>Code OTP (4 chiffres)</Text>
             <TextInput
@@ -220,6 +236,48 @@ export default function RechargeScreen({ navigation }: Props) {
           </View>
         )}
       </ScrollView>
+
+      {/* Country Picker Modal */}
+      <Modal
+        visible={countryPickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCountryPickerVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Choisir un pays</Text>
+              <TouchableOpacity onPress={() => setCountryPickerVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={ORANGE_MONEY_COUNTRIES}
+              keyExtractor={(item) => item.code}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.countryItem,
+                    country.code === item.code && styles.countryItemActive,
+                  ]}
+                  onPress={() => {
+                    setCountry(item);
+                    setCountryPickerVisible(false);
+                  }}
+                >
+                  <Text style={styles.countryItemFlag}>{item.flag}</Text>
+                  <Text style={styles.countryItemName}>{item.name}</Text>
+                  <Text style={styles.countryItemDial}>{item.dialCode}</Text>
+                  {country.code === item.code && (
+                    <Ionicons name="checkmark" size={20} color={COLORS.primary} />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
 
       <Navbar active="Recharge" />
     </View>
@@ -400,5 +458,88 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: FONTS.regular,
     textAlign: 'center',
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  countrySelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  countryFlag: {
+    fontSize: 16,
+  },
+  countryDialCode: {
+    color: COLORS.text,
+    fontSize: FONTS.regular,
+    fontWeight: 'bold',
+  },
+  phoneInput: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: SPACING.md,
+    fontSize: FONTS.large,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '60%',
+    paddingBottom: SPACING.xl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modalTitle: {
+    color: COLORS.text,
+    fontSize: FONTS.medium,
+    fontWeight: 'bold',
+  },
+  countryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  countryItemActive: {
+    backgroundColor: COLORS.surface,
+  },
+  countryItemFlag: {
+    fontSize: 20,
+  },
+  countryItemName: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: FONTS.regular,
+  },
+  countryItemDial: {
+    color: COLORS.textSecondary,
+    fontSize: FONTS.regular,
   },
 });

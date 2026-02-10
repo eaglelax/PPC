@@ -9,18 +9,24 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Modal,
+  FlatList,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { createUser } from '../services/userService';
 import { COLORS, FONTS, SPACING } from '../config/theme';
+import { ORANGE_MONEY_COUNTRIES, DEFAULT_COUNTRY, Country } from '../config/countries';
 
 export default function AuthScreen() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
+  const [countryPickerVisible, setCountryPickerVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
@@ -30,6 +36,10 @@ export default function AuthScreen() {
     }
     if (!isLogin && !displayName.trim()) {
       Alert.alert('Erreur', 'Veuillez entrer un pseudo.');
+      return;
+    }
+    if (!isLogin && phone.length < 8) {
+      Alert.alert('Erreur', 'Veuillez entrer un numero de telephone valide.');
       return;
     }
     if (password.length < 6) {
@@ -43,7 +53,8 @@ export default function AuthScreen() {
         await signInWithEmailAndPassword(auth, email.trim(), password);
       } else {
         const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
-        await createUser(credential.user.uid, email.trim(), displayName.trim());
+        const fullPhone = country.dialCode + phone.trim();
+        await createUser(credential.user.uid, email.trim(), displayName.trim(), fullPhone);
       }
     } catch (error: any) {
       let message = 'Une erreur est survenue.';
@@ -91,6 +102,26 @@ export default function AuthScreen() {
               autoCapitalize="none"
             />
           )}
+          {!isLogin && (
+            <View style={styles.phoneRow}>
+              <TouchableOpacity
+                style={styles.countrySelector}
+                onPress={() => setCountryPickerVisible(true)}
+              >
+                <Text style={styles.countryFlag}>{country.flag}</Text>
+                <Text style={styles.countryDialCode}>{country.dialCode}</Text>
+                <Ionicons name="chevron-down" size={14} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+              <TextInput
+                style={styles.phoneInput}
+                placeholder="Numero de telephone"
+                placeholderTextColor={COLORS.textSecondary}
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+              />
+            </View>
+          )}
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -130,6 +161,48 @@ export default function AuthScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Country Picker Modal */}
+      <Modal
+        visible={countryPickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCountryPickerVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Choisir un pays</Text>
+              <TouchableOpacity onPress={() => setCountryPickerVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={ORANGE_MONEY_COUNTRIES}
+              keyExtractor={(item) => item.code}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.countryItem,
+                    country.code === item.code && styles.countryItemActive,
+                  ]}
+                  onPress={() => {
+                    setCountry(item);
+                    setCountryPickerVisible(false);
+                  }}
+                >
+                  <Text style={styles.countryItemFlag}>{item.flag}</Text>
+                  <Text style={styles.countryItemName}>{item.name}</Text>
+                  <Text style={styles.countryItemDial}>{item.dialCode}</Text>
+                  {country.code === item.code && (
+                    <Ionicons name="checkmark" size={20} color={COLORS.primary} />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -201,5 +274,87 @@ const styles = StyleSheet.create({
     fontSize: FONTS.regular,
     textAlign: 'center',
     marginTop: SPACING.sm,
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  countrySelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  countryFlag: {
+    fontSize: 16,
+  },
+  countryDialCode: {
+    color: COLORS.text,
+    fontSize: FONTS.regular,
+    fontWeight: 'bold',
+  },
+  phoneInput: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: SPACING.md,
+    fontSize: FONTS.regular,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '60%',
+    paddingBottom: SPACING.xl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modalTitle: {
+    color: COLORS.text,
+    fontSize: FONTS.medium,
+    fontWeight: 'bold',
+  },
+  countryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  countryItemActive: {
+    backgroundColor: COLORS.surface,
+  },
+  countryItemFlag: {
+    fontSize: 20,
+  },
+  countryItemName: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: FONTS.regular,
+  },
+  countryItemDial: {
+    color: COLORS.textSecondary,
+    fontSize: FONTS.regular,
   },
 });

@@ -5,12 +5,13 @@ import { INITIAL_BALANCE } from '../config/theme';
 
 const USERS_COLLECTION = 'users';
 
-export async function createUser(uid: string, email: string, displayName: string): Promise<void> {
+export async function createUser(uid: string, email: string, displayName: string, phone: string): Promise<void> {
   const userRef = doc(db, USERS_COLLECTION, uid);
   await setDoc(userRef, {
     odId: uid,
     email,
     displayName,
+    phone,
     balance: INITIAL_BALANCE,
     createdAt: serverTimestamp(),
     stats: {

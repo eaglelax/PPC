@@ -2,6 +2,7 @@ export interface UserData {
   odId: string;
   email: string;
   displayName: string;
+  phone: string;
   balance: number;
   pix: number;
   createdAt: Date;

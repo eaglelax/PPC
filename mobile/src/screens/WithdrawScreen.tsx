@@ -9,6 +9,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -17,24 +19,18 @@ import { withdrawFunds, getWithdrawalFee } from '../services/betService';
 import { COLORS, FONTS, SPACING } from '../config/theme';
 import { RootStackParamList } from '../types';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
+import { ORANGE_MONEY_COUNTRIES, DEFAULT_COUNTRY, Country } from '../config/countries';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Withdraw'>;
 };
 
-type PaymentMethod = 'Orange' | 'MTN' | 'Moov';
-
-const PAYMENT_METHODS: { key: PaymentMethod; label: string; color: string }[] = [
-  { key: 'Orange', label: 'Orange Money', color: '#FF6600' },
-  { key: 'MTN', label: 'MTN MoMo', color: '#FFCC00' },
-  { key: 'Moov', label: 'Moov Money', color: '#0066CC' },
-];
-
 export default function WithdrawScreen({ navigation }: Props) {
   const { userData } = useAuth();
   const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState<PaymentMethod | null>(null);
   const [phone, setPhone] = useState('');
+  const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
+  const [countryPickerVisible, setCountryPickerVisible] = useState(false);
   const [feePercent, setFeePercent] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingFee, setLoadingFee] = useState(true);
@@ -65,23 +61,19 @@ export default function WithdrawScreen({ navigation }: Props) {
       Alert.alert('Solde insuffisant', `Votre solde est de ${userData.balance.toLocaleString()}F.`);
       return;
     }
-    if (!method) {
-      Alert.alert('Erreur', 'Veuillez choisir une methode de retrait.');
-      return;
-    }
     if (!phone || phone.length < 8) {
       Alert.alert('Erreur', 'Veuillez entrer un numero valide.');
       return;
     }
 
     if (Platform.OS === 'web') {
-      if (window.confirm(`Confirmer le retrait de ${numAmount.toLocaleString()}F via ${method} ?\nVous recevrez ${netAmount.toLocaleString()}F (frais ${fee.toLocaleString()}F)`)) {
+      if (window.confirm(`Confirmer le retrait de ${numAmount.toLocaleString()}F via Orange Money ?\nVous recevrez ${netAmount.toLocaleString()}F (frais ${fee.toLocaleString()}F)`)) {
         processWithdraw();
       }
     } else {
       Alert.alert(
         'Confirmer le retrait',
-        `Retirer ${numAmount.toLocaleString()}F via ${method} ?\nVous recevrez ${netAmount.toLocaleString()}F (frais ${fee.toLocaleString()}F)`,
+        `Retirer ${numAmount.toLocaleString()}F via Orange Money ?\nVous recevrez ${netAmount.toLocaleString()}F (frais ${fee.toLocaleString()}F)`,
         [
           { text: 'Annuler', style: 'cancel' },
           { text: 'Confirmer', onPress: () => processWithdraw() },
@@ -92,18 +84,18 @@ export default function WithdrawScreen({ navigation }: Props) {
 
   const processWithdraw = async () => {
     setLoading(true);
+    const fullPhone = country.dialCode + phone;
     try {
-      const result = await withdrawFunds(numAmount, method!, phone);
+      const result = await withdrawFunds(numAmount, 'Orange', fullPhone);
       if (Platform.OS === 'web') {
-        window.alert(`Retrait effectue ! ${result.netAmount.toLocaleString()}F envoyes sur ${method} (${phone})\nFrais: ${result.fee.toLocaleString()}F`);
+        window.alert(`Retrait effectue ! ${result.netAmount.toLocaleString()}F envoyes sur Orange Money (${fullPhone})\nFrais: ${result.fee.toLocaleString()}F`);
       } else {
         Alert.alert(
           'Retrait effectue',
-          `${result.netAmount.toLocaleString()}F envoyes sur ${method} (${phone})\nFrais: ${result.fee.toLocaleString()}F`
+          `${result.netAmount.toLocaleString()}F envoyes sur Orange Money (${fullPhone})\nFrais: ${result.fee.toLocaleString()}F`
         );
       }
       setAmount('');
-      setMethod(null);
       setPhone('');
     } catch (error: any) {
       Alert.alert('Erreur', error.message);
@@ -144,38 +136,25 @@ export default function WithdrawScreen({ navigation }: Props) {
       />
       <Text style={styles.minText}>Minimum : 1 000F</Text>
 
-      <Text style={styles.label}>Methode de retrait</Text>
-      <View style={styles.methodsRow}>
-        {PAYMENT_METHODS.map((m) => (
-          <TouchableOpacity
-            key={m.key}
-            style={[
-              styles.methodBtn,
-              method === m.key && { borderColor: m.color, borderWidth: 2 },
-            ]}
-            onPress={() => setMethod(m.key)}
-          >
-            <Text
-              style={[
-                styles.methodText,
-                method === m.key && { color: m.color, fontWeight: 'bold' },
-              ]}
-            >
-              {m.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <Text style={styles.label}>Numero Orange Money</Text>
+      <View style={styles.phoneRow}>
+        <TouchableOpacity
+          style={styles.countrySelector}
+          onPress={() => setCountryPickerVisible(true)}
+        >
+          <Text style={styles.countryFlag}>{country.flag}</Text>
+          <Text style={styles.countryDialCode}>{country.dialCode}</Text>
+          <Ionicons name="chevron-down" size={14} color={COLORS.textSecondary} />
+        </TouchableOpacity>
+        <TextInput
+          style={styles.phoneInput}
+          placeholder="77123456"
+          placeholderTextColor={COLORS.textSecondary}
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+        />
       </View>
-
-      <Text style={styles.label}>Numero de telephone</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Ex: 07XXXXXXXX"
-        placeholderTextColor={COLORS.textSecondary}
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-      />
 
       <View style={styles.summary}>
         <View style={styles.summaryRow}>
@@ -199,16 +178,59 @@ export default function WithdrawScreen({ navigation }: Props) {
       <TouchableOpacity
         style={[
           styles.button,
-          (loading || !numAmount || !method || !phone) && styles.buttonDisabled,
+          (loading || !numAmount || !phone) && styles.buttonDisabled,
         ]}
         onPress={handleWithdraw}
-        disabled={loading || !numAmount || !method || !phone}
+        disabled={loading || !numAmount || !phone}
       >
+        <Ionicons name="phone-portrait-outline" size={20} color={COLORS.text} />
         <Text style={styles.buttonText}>
-          {loading ? 'Traitement...' : 'Retirer'}
+          {loading ? 'Traitement...' : 'Retirer via Orange Money'}
         </Text>
       </TouchableOpacity>
     </ScrollView>
+
+    {/* Country Picker Modal */}
+    <Modal
+      visible={countryPickerVisible}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setCountryPickerVisible(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Choisir un pays</Text>
+            <TouchableOpacity onPress={() => setCountryPickerVisible(false)}>
+              <Ionicons name="close" size={24} color={COLORS.text} />
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={ORANGE_MONEY_COUNTRIES}
+            keyExtractor={(item) => item.code}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[
+                  styles.countryItem,
+                  country.code === item.code && styles.countryItemActive,
+                ]}
+                onPress={() => {
+                  setCountry(item);
+                  setCountryPickerVisible(false);
+                }}
+              >
+                <Text style={styles.countryItemFlag}>{item.flag}</Text>
+                <Text style={styles.countryItemName}>{item.name}</Text>
+                <Text style={styles.countryItemDial}>{item.dialCode}</Text>
+                {country.code === item.code && (
+                  <Ionicons name="checkmark" size={20} color={COLORS.primary} />
+                )}
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </View>
+    </Modal>
 
     <Navbar active="Withdraw" />
     </View>
@@ -279,21 +301,39 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: SPACING.md,
   },
-  methodsRow: {
+  phoneRow: {
+    flexDirection: 'row',
     gap: SPACING.sm,
     marginBottom: SPACING.lg,
   },
-  methodBtn: {
+  countrySelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: COLORS.surface,
     borderRadius: 12,
-    padding: SPACING.md,
-    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  methodText: {
-    color: COLORS.textSecondary,
+  countryFlag: {
+    fontSize: 16,
+  },
+  countryDialCode: {
+    color: COLORS.text,
     fontSize: FONTS.regular,
+    fontWeight: 'bold',
+  },
+  phoneInput: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: SPACING.md,
+    fontSize: FONTS.large,
+    color: COLORS.text,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   summary: {
     backgroundColor: COLORS.surface,
@@ -321,10 +361,13 @@ const styles = StyleSheet.create({
     fontSize: FONTS.regular,
   },
   button: {
-    backgroundColor: COLORS.success,
+    backgroundColor: '#FF6600',
     borderRadius: 12,
     padding: SPACING.md,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: SPACING.sm,
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -333,5 +376,55 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: FONTS.medium,
     fontWeight: 'bold',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '60%',
+    paddingBottom: SPACING.xl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modalTitle: {
+    color: COLORS.text,
+    fontSize: FONTS.medium,
+    fontWeight: 'bold',
+  },
+  countryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  countryItemActive: {
+    backgroundColor: COLORS.surface,
+  },
+  countryItemFlag: {
+    fontSize: 20,
+  },
+  countryItemName: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: FONTS.regular,
+  },
+  countryItemDial: {
+    color: COLORS.textSecondary,
+    fontSize: FONTS.regular,
   },
 });
