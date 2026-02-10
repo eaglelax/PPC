@@ -20,6 +20,7 @@ import {
   OrangeMoneyError,
 } from '../services/orangeMoneyService';
 import { rechargeBalance } from '../services/transactionService';
+import { MIN_RECHARGE } from '../config/constants';
 
 const router = Router();
 
@@ -35,6 +36,10 @@ router.post('/pay', verifyToken, async (req: AuthRequest, res) => {
 
     if (!numAmount || numAmount <= 0) {
       res.status(400).json({ error: 'Montant invalide.' });
+      return;
+    }
+    if (numAmount < MIN_RECHARGE) {
+      res.status(400).json({ error: `Le montant minimum de recharge est de ${MIN_RECHARGE}F.` });
       return;
     }
     if (!phone || phone.length < 8) {

@@ -1,8 +1,9 @@
 import { db } from '../config/firebase';
-import { MIN_BET_AMOUNT, BetStatus } from '../config/constants';
+import { MIN_BET_AMOUNT, GAME_FEE, BetStatus } from '../config/constants';
 import { getUser, updateBalance } from './userService';
 import { createTransaction } from './transactionService';
 import { createGame } from './gameService';
+import { recordFee } from './feeService';
 
 const BETS = 'bets';
 
@@ -22,7 +23,7 @@ export async function createBet(userId: string, displayName: string, amount: num
 
   const user = await getUser(userId);
   if (!user) throw new Error('Utilisateur introuvable.');
-  if (user.balance < amount) throw new Error('Solde insuffisant.');
+  if (user.balance < amount + GAME_FEE) throw new Error('Solde insuffisant.');
 
   // Check if user already has a waiting bet
   const existingSnap = await db
@@ -35,15 +36,17 @@ export async function createBet(userId: string, displayName: string, amount: num
     throw new Error('Vous avez deja un pari en attente.');
   }
 
-  // Deduct balance
-  await updateBalance(userId, user.balance - amount);
-  await createTransaction(userId, 'bet', amount);
+  // Deduct balance (bet amount + game fee)
+  await updateBalance(userId, user.balance - (amount + GAME_FEE));
+  await createTransaction(userId, 'bet', amount, GAME_FEE);
+  await recordFee(userId, 'game_fee', GAME_FEE);
 
   // Create bet document
   const ref = await db.collection(BETS).add({
     creatorId: userId,
     creatorName: displayName,
     amount,
+    gameFee: GAME_FEE,
     status: 'waiting' as BetStatus,
     createdAt: new Date(),
   });
@@ -63,11 +66,12 @@ export async function joinBet(betId: string, userId: string, displayName: string
 
   const user = await getUser(userId);
   if (!user) throw new Error('Utilisateur introuvable.');
-  if (user.balance < bet.amount) throw new Error('Solde insuffisant.');
+  if (user.balance < bet.amount + GAME_FEE) throw new Error('Solde insuffisant.');
 
-  // Deduct balance
-  await updateBalance(userId, user.balance - bet.amount);
-  await createTransaction(userId, 'bet', bet.amount);
+  // Deduct balance (bet amount + game fee)
+  await updateBalance(userId, user.balance - (bet.amount + GAME_FEE));
+  await createTransaction(userId, 'bet', bet.amount, GAME_FEE);
+  await recordFee(userId, 'game_fee', GAME_FEE);
 
   // Create game
   const gameId = await createGame(
@@ -98,11 +102,12 @@ export async function cancelBet(betId: string, userId: string) {
   if (bet.creatorId !== userId) throw new Error('Vous n\'etes pas le createur de ce pari.');
   if (bet.status !== 'waiting') throw new Error('Ce pari ne peut plus etre annule.');
 
-  // Refund
+  // Refund (bet amount + game fee)
+  const refundAmount = bet.amount + (bet.gameFee || 0);
   const user = await getUser(userId);
   if (user) {
-    await updateBalance(userId, user.balance + bet.amount);
-    await createTransaction(userId, 'refund', bet.amount);
+    await updateBalance(userId, user.balance + refundAmount);
+    await createTransaction(userId, 'refund', refundAmount);
   }
 
   // Update status

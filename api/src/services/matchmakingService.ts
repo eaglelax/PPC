@@ -1,8 +1,9 @@
 import { db } from '../config/firebase';
-import { BetAmount } from '../config/constants';
+import { BetAmount, GAME_FEE } from '../config/constants';
 import { createGame } from './gameService';
 import { updateBalance, getUser } from './userService';
 import { createTransaction } from './transactionService';
+import { recordFee } from './feeService';
 
 const WAITING_ROOM = 'waiting_room';
 
@@ -14,7 +15,7 @@ export async function joinWaitingRoom(
   // Verify user has enough balance
   const user = await getUser(userId);
   if (!user) throw new Error('Utilisateur introuvable.');
-  if (user.balance < betAmount) {
+  if (user.balance < betAmount + GAME_FEE) {
     throw new Error('Solde insuffisant.');
   }
 
@@ -29,9 +30,10 @@ export async function joinWaitingRoom(
     throw new Error('Vous etes deja en file d\'attente.');
   }
 
-  // Deduct bet amount
-  await updateBalance(userId, user.balance - betAmount);
-  await createTransaction(userId, 'bet', betAmount);
+  // Deduct bet amount + game fee
+  await updateBalance(userId, user.balance - (betAmount + GAME_FEE));
+  await createTransaction(userId, 'bet', betAmount, GAME_FEE);
+  await recordFee(userId, 'game_fee', GAME_FEE);
 
   // Look for an opponent with the same bet
   const opponentSnap = await db
@@ -65,6 +67,7 @@ export async function joinWaitingRoom(
         userId,
         displayName,
         betAmount,
+        gameFee: GAME_FEE,
         createdAt: new Date(),
         status: 'matched',
         gameId,
@@ -80,6 +83,7 @@ export async function joinWaitingRoom(
     userId,
     displayName,
     betAmount,
+    gameFee: GAME_FEE,
     createdAt: new Date(),
     status: 'waiting',
   });
@@ -101,11 +105,12 @@ export async function leaveWaitingRoom(userId: string) {
   const doc = snap.docs[0];
   const data = doc.data();
 
-  // Refund the bet
+  // Refund the bet + game fee
+  const refundAmount = data.betAmount + (data.gameFee || 0);
   const user = await getUser(userId);
   if (user) {
-    await updateBalance(userId, user.balance + data.betAmount);
-    await createTransaction(userId, 'refund', data.betAmount);
+    await updateBalance(userId, user.balance + refundAmount);
+    await createTransaction(userId, 'refund', refundAmount);
   }
 
   // Delete all waiting entries

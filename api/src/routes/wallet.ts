@@ -15,6 +15,11 @@ router.post('/withdraw', verifyToken, async (req: AuthRequest, res) => {
       return;
     }
 
+    if (numAmount < 1000) {
+      res.status(400).json({ error: 'Le montant minimum de retrait est de 1 000F.' });
+      return;
+    }
+
     if (!method || !['Orange', 'MTN', 'Moov'].includes(method)) {
       res.status(400).json({ error: 'Methode de paiement invalide.' });
       return;

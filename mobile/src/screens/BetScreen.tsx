@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
-import { COLORS, FONTS, SPACING, MIN_BET_AMOUNT } from '../config/theme';
+import { COLORS, FONTS, SPACING, MIN_BET_AMOUNT, GAME_FEE } from '../config/theme';
 import { RootStackParamList, Bet } from '../types';
 import { onAvailableBets, createBet, joinBet } from '../services/betService';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
@@ -47,8 +47,8 @@ export default function BetScreen({ navigation }: Props) {
       Alert.alert('Erreur', `Le montant minimum est de ${MIN_BET_AMOUNT.toLocaleString()}F.`);
       return;
     }
-    if (amount > userData.balance) {
-      Alert.alert('Solde insuffisant', `Votre solde est de ${userData.balance.toLocaleString()}F.`, [
+    if (amount + GAME_FEE > userData.balance) {
+      Alert.alert('Solde insuffisant', `Il vous faut ${(amount + GAME_FEE).toLocaleString()}F (mise + frais).`, [
         { text: 'Recharger', onPress: () => navigation.navigate('Recharge') },
         { text: 'Annuler', style: 'cancel' },
       ]);
@@ -73,8 +73,8 @@ export default function BetScreen({ navigation }: Props) {
       Alert.alert('Erreur', 'Vous ne pouvez pas rejoindre votre propre pari.');
       return;
     }
-    if (bet.amount > userData.balance) {
-      Alert.alert('Solde insuffisant', `Il vous faut ${bet.amount.toLocaleString()}F.`, [
+    if (bet.amount + GAME_FEE > userData.balance) {
+      Alert.alert('Solde insuffisant', `Il vous faut ${(bet.amount + GAME_FEE).toLocaleString()}F (mise + frais).`, [
         { text: 'Recharger', onPress: () => navigation.navigate('Recharge') },
         { text: 'Annuler', style: 'cancel' },
       ]);
@@ -117,7 +117,10 @@ export default function BetScreen({ navigation }: Props) {
           </View>
           <Text style={styles.betTime}>{getTimeAgo(item.createdAt)}</Text>
         </View>
-        <Text style={styles.betAmount}>{item.amount.toLocaleString()}F</Text>
+        <View style={{ alignItems: 'flex-end', marginRight: SPACING.md }}>
+          <Text style={styles.betAmount}>{item.amount.toLocaleString()}F</Text>
+          <Text style={styles.betFee}>+{GAME_FEE}F frais</Text>
+        </View>
         {isOwn ? (
           <TouchableOpacity
             style={styles.ownBadge}
@@ -199,9 +202,17 @@ export default function BetScreen({ navigation }: Props) {
             />
 
             {betAmount ? (
-              <Text style={styles.modalGain}>
-                Gain potentiel : {(parseInt(betAmount, 10) * 2 || 0).toLocaleString()}F
-              </Text>
+              <View style={styles.modalFeeInfo}>
+                <Text style={styles.modalFeeText}>
+                  Frais de partie : {GAME_FEE}F
+                </Text>
+                <Text style={styles.modalFeeText}>
+                  Total debite : {((parseInt(betAmount, 10) || 0) + GAME_FEE).toLocaleString()}F
+                </Text>
+                <Text style={styles.modalGain}>
+                  Gain potentiel : {(parseInt(betAmount, 10) * 2 || 0).toLocaleString()}F
+                </Text>
+              </View>
             ) : null}
 
             <View style={styles.modalButtons}>
@@ -296,7 +307,10 @@ const styles = StyleSheet.create({
     color: COLORS.gold,
     fontSize: FONTS.large,
     fontWeight: 'bold',
-    marginRight: SPACING.md,
+  },
+  betFee: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
   },
   joinButton: {
     backgroundColor: COLORS.primary,
@@ -390,11 +404,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: SPACING.md,
   },
+  modalFeeInfo: {
+    backgroundColor: COLORS.background,
+    borderRadius: 8,
+    padding: SPACING.sm,
+    marginBottom: SPACING.lg,
+    gap: 4,
+  },
+  modalFeeText: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    textAlign: 'center',
+  },
   modalGain: {
     color: COLORS.success,
     fontSize: 14,
     textAlign: 'center',
-    marginBottom: SPACING.lg,
+    fontWeight: 'bold',
   },
   modalButtons: {
     flexDirection: 'row',

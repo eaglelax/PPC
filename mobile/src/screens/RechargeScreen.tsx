@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
 import { payWithOrangeMoney } from '../config/api';
-import { COLORS, FONTS, SPACING } from '../config/theme';
+import { COLORS, FONTS, SPACING, MIN_RECHARGE } from '../config/theme';
 import { RootStackParamList } from '../types';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
 
@@ -32,11 +32,15 @@ export default function RechargeScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
 
   const numAmount = parseInt(amount, 10) || 0;
-  const quickAmounts = [1000, 2000, 5000, 10000];
+  const quickAmounts = [1010, 2000, 5000, 10000];
 
   const handleContinue = () => {
     if (numAmount <= 0) {
       Alert.alert('Erreur', 'Veuillez entrer un montant valide.');
+      return;
+    }
+    if (numAmount < MIN_RECHARGE) {
+      Alert.alert('Erreur', `Le montant minimum de recharge est de ${MIN_RECHARGE.toLocaleString()}F.`);
       return;
     }
     setStep('details');
@@ -87,10 +91,10 @@ export default function RechargeScreen({ navigation }: Props) {
 
         {step === 'amount' && (
           <>
-            <Text style={styles.label}>Montant de la recharge</Text>
+            <Text style={styles.label}>Montant de la recharge (min {MIN_RECHARGE.toLocaleString()}F)</Text>
             <TextInput
               style={styles.input}
-              placeholder="Entrez le montant"
+              placeholder={`${MIN_RECHARGE.toLocaleString()}F minimum`}
               placeholderTextColor={COLORS.textSecondary}
               value={amount}
               onChangeText={setAmount}

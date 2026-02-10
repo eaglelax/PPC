@@ -56,6 +56,10 @@ export default function WithdrawScreen({ navigation }: Props) {
       Alert.alert('Erreur', 'Veuillez entrer un montant valide.');
       return;
     }
+    if (numAmount < 1000) {
+      Alert.alert('Erreur', 'Le montant minimum de retrait est de 1 000F.');
+      return;
+    }
     if (numAmount > userData.balance) {
       Alert.alert('Solde insuffisant', `Votre solde est de ${userData.balance.toLocaleString()}F.`);
       return;
@@ -114,6 +118,7 @@ export default function WithdrawScreen({ navigation }: Props) {
         onChangeText={setAmount}
         keyboardType="numeric"
       />
+      <Text style={styles.minText}>Minimum : 1 000F</Text>
 
       <Text style={styles.label}>Methode de retrait</Text>
       <View style={styles.methodsRow}>
@@ -241,6 +246,12 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     borderWidth: 1,
     borderColor: COLORS.border,
+    textAlign: 'center',
+    marginBottom: SPACING.xs,
+  },
+  minText: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
     textAlign: 'center',
     marginBottom: SPACING.md,
   },
