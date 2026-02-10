@@ -12,6 +12,7 @@ export const COLORS = {
   textSecondary: '#A7A9BE',
   border: '#2E2E4A',
   gold: '#FFD700',
+  pix: '#00D9FF',
 };
 
 export const FONTS = {

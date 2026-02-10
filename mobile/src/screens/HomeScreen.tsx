@@ -40,6 +40,11 @@ export default function HomeScreen() {
         <Ionicons name="wallet" size={32} color={COLORS.primary} style={{ marginBottom: SPACING.sm }} />
         <Text style={styles.balanceLabel}>Votre solde</Text>
         <Text style={styles.balanceAmount}>{userData.balance.toLocaleString()}F</Text>
+        <View style={styles.pixContainer}>
+          <Ionicons name="diamond" size={20} color={COLORS.pix} />
+          <Text style={styles.pixValue}>{userData.pix || 0}</Text>
+          <Text style={styles.pixLabel}>Pix</Text>
+        </View>
       </View>
 
       <View style={styles.statsRow}>
@@ -136,6 +141,25 @@ const styles = StyleSheet.create({
     fontSize: FONTS.title,
     fontWeight: 'bold',
     color: COLORS.gold,
+  },
+  pixContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: 12,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    gap: 6,
+    marginTop: SPACING.md,
+  },
+  pixValue: {
+    color: COLORS.pix,
+    fontSize: FONTS.large,
+    fontWeight: 'bold',
+  },
+  pixLabel: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
   },
   statsRow: {
     flexDirection: 'row',

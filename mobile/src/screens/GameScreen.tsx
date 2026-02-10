@@ -4,7 +4,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
-import { onGameUpdate, makeChoice, getRandomChoice } from '../services/gameService';
+import { onGameUpdate, getRandomChoice } from '../services/gameService';
+import { submitChoice } from '../config/api';
 import { COLORS, FONTS, SPACING, CHOICE_TIMER } from '../config/theme';
 import { RootStackParamList, Choice, Game } from '../types';
 
@@ -42,14 +43,16 @@ export default function GameScreen({ navigation, route }: Props) {
 
       if (g?.status === 'draw') {
         setShowDraw(true);
+        // Don't reset hasChosen yet - wait until status goes back to 'choosing'
+      }
+
+      if (g?.status === 'choosing' && showDraw) {
+        // Draw phase is over, allow new choices
+        setShowDraw(false);
         setSelectedChoice(null);
         setHasChosen(false);
         hasChosenRef.current = false;
         setTimer(CHOICE_TIMER);
-      }
-
-      if (g?.status === 'choosing' && showDraw) {
-        setShowDraw(false);
       }
 
       if (g?.status === 'resolved') {
@@ -67,7 +70,14 @@ export default function GameScreen({ navigation, route }: Props) {
 
     if (timerRef.current) clearInterval(timerRef.current);
 
-    await makeChoice(gameId, firebaseUser.uid, choice);
+    try {
+      await submitChoice(gameId, choice);
+    } catch {
+      // If API rejects (e.g. game not in choosing phase), reset state
+      hasChosenRef.current = false;
+      setHasChosen(false);
+      setSelectedChoice(null);
+    }
   }, [firebaseUser, gameId]);
 
   // Timer countdown
@@ -127,7 +137,7 @@ export default function GameScreen({ navigation, route }: Props) {
         <Text style={styles.timerLabel}>secondes</Text>
       </View>
 
-      {hasChosen ? (
+      {hasChosen || game.status !== 'choosing' ? (
         <View style={styles.waitingContainer}>
           {selectedChoiceData && (
             <MaterialCommunityIcons
@@ -137,9 +147,11 @@ export default function GameScreen({ navigation, route }: Props) {
               style={{ marginBottom: SPACING.lg }}
             />
           )}
-          <Text style={styles.waitingText}>
-            En attente de {opponent.displayName}...
-          </Text>
+          {hasChosen && game.status === 'choosing' && (
+            <Text style={styles.waitingText}>
+              En attente de {opponent.displayName}...
+            </Text>
+          )}
         </View>
       ) : (
         <View style={styles.choicesContainer}>

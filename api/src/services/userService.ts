@@ -15,6 +15,7 @@ export async function createUser(uid: string, email: string, displayName: string
     email,
     displayName,
     balance: INITIAL_BALANCE,
+    pix: 0,
     createdAt: new Date(),
     stats: { gamesPlayed: 0, wins: 0, losses: 0 },
   };

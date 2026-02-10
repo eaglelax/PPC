@@ -65,6 +65,12 @@ export default function ResultScreen({ navigation, route }: Props) {
         <Text style={[styles.resultAmount, { color: isWinner ? COLORS.success : COLORS.danger }]}>
           {isWinner ? `+${winAmount.toLocaleString()}F` : `-${game.betAmount.toLocaleString()}F`}
         </Text>
+        {isWinner && (
+          <View style={styles.pixReward}>
+            <Ionicons name="diamond" size={24} color={COLORS.pix} />
+            <Text style={styles.pixRewardText}>+1 Pix</Text>
+          </View>
+        )}
       </Animated.View>
 
       <View style={styles.matchup}>
@@ -148,6 +154,21 @@ const styles = StyleSheet.create({
     fontSize: FONTS.xlarge,
     fontWeight: 'bold',
     marginTop: SPACING.sm,
+  },
+  pixReward: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: SPACING.sm,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+  },
+  pixRewardText: {
+    color: COLORS.pix,
+    fontSize: FONTS.medium,
+    fontWeight: 'bold',
   },
   matchup: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import { db } from '../config/firebase';
+import admin, { db } from '../config/firebase';
 import { Choice } from '../config/constants';
 import { updateBalance, getUser, updateStats } from './userService';
 import { createTransaction } from './transactionService';
@@ -38,8 +38,8 @@ export async function makeChoice(gameId: string, userId: string, choice: Choice)
 
     const game = snap.data()!;
 
-    if (game.status === 'resolved') {
-      throw new Error('Partie deja terminee.');
+    if (game.status !== 'choosing') {
+      throw new Error('La partie n\'est pas en phase de choix.');
     }
 
     const isPlayer1 = game.player1.userId === userId;
@@ -64,7 +64,8 @@ export async function makeChoice(gameId: string, userId: string, choice: Choice)
 
     if (winner === 'draw') {
       transaction.update(gameRef, {
-        [choiceField]: choice,
+        'player1.choice': null,
+        'player2.choice': null,
         status: 'draw',
         round: (game.round || 1) + 1,
       });
@@ -96,6 +97,9 @@ export async function makeChoice(gameId: string, userId: string, choice: Choice)
       await updateBalance(winnerId, winnerData.balance + totalWin);
       await createTransaction(winnerId, 'win', totalWin);
     }
+    await db.collection('users').doc(winnerId).update({
+      pix: admin.firestore.FieldValue.increment(1),
+    });
     await createTransaction(loserId, 'loss', betAmount);
     await updateStats(winnerId, true);
     await updateStats(loserId, false);

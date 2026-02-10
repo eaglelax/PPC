@@ -3,6 +3,7 @@ export interface UserData {
   email: string;
   displayName: string;
   balance: number;
+  pix: number;
   createdAt: Date;
   stats: {
     gamesPlayed: number;
