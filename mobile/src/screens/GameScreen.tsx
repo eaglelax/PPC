@@ -108,26 +108,27 @@ export default function GameScreen({ navigation, route }: Props) {
     if (hasChosen || !game || game.status !== 'choosing') return;
 
     timerRef.current = setInterval(() => {
-      setTimer((prev) => {
-        if (prev <= 1) {
-          if (!hasChosenRef.current && firebaseUser) {
-            hasChosenRef.current = true;
-            setHasChosen(true);
-            submitTimeout(gameId).catch(() => {
-              hasChosenRef.current = false;
-              setHasChosen(false);
-            });
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimer((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [hasChosen, game?.status, game?.round, firebaseUser, gameId]);
+  }, [hasChosen, game?.status, game?.round]);
+
+  // Handle timeout when timer reaches 0
+  useEffect(() => {
+    if (timer !== 0 || hasChosenRef.current || !firebaseUser || !game || game.status !== 'choosing') return;
+
+    hasChosenRef.current = true;
+    setHasChosen(true);
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    submitTimeout(gameId).catch(() => {
+      hasChosenRef.current = false;
+      setHasChosen(false);
+    });
+  }, [timer, firebaseUser, gameId, game?.status]);
 
   const animatePress = (index: number) => {
     Animated.sequence([
