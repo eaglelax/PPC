@@ -27,14 +27,25 @@ export async function createGame(
   return ref.id;
 }
 
-export function onGameUpdate(gameId: string, callback: (game: Game | null) => void) {
-  return onSnapshot(doc(db, GAMES_COLLECTION, gameId), (snap) => {
-    if (snap.exists()) {
-      callback({ odId: snap.id, ...snap.data() } as Game);
-    } else {
-      callback(null);
+export function onGameUpdate(
+  gameId: string,
+  callback: (game: Game | null) => void,
+  onError?: (error: Error) => void
+) {
+  return onSnapshot(
+    doc(db, GAMES_COLLECTION, gameId),
+    (snap) => {
+      if (snap.exists()) {
+        callback({ odId: snap.id, ...snap.data() } as Game);
+      } else {
+        callback(null);
+      }
+    },
+    (error) => {
+      console.error('Game snapshot error:', error);
+      if (onError) onError(error);
     }
-  });
+  );
 }
 
 export function getRandomChoice(): Choice {

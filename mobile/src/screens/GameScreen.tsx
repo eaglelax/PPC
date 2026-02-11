@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert, AppState } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import NetInfo from '@react-native-community/netinfo';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
@@ -31,8 +32,11 @@ export default function GameScreen({ navigation, route }: Props) {
   const [timer, setTimer] = useState(CHOICE_TIMER);
   const [hasChosen, setHasChosen] = useState(false);
   const [showDraw, setShowDraw] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasChosenRef = useRef(false);
+  const timeoutFailCountRef = useRef(0);
+  const isOfflineRef = useRef(false);
   const scaleAnims = useRef(CHOICES.map(() => new Animated.Value(1))).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
   const roundAnim = useRef(new Animated.Value(0)).current;
@@ -76,6 +80,33 @@ export default function GameScreen({ navigation, route }: Props) {
     }
   }, [game?.round, roundAnim]);
 
+  // Network connectivity monitoring
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const offline = !(state.isConnected && state.isInternetReachable !== false);
+      isOfflineRef.current = offline;
+      setIsOffline(offline);
+
+      // When coming back online, try to cancel stale game if we've been stuck
+      if (!offline && game?.status === 'choosing' && timeoutFailCountRef.current > 0) {
+        timeoutFailCountRef.current = 0;
+        cancelStaleGame(gameId).catch(() => {});
+      }
+    });
+    return () => unsubscribe();
+  }, [gameId, game?.status]);
+
+  // Auto-cancel when app goes to background during game
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'background' && game?.status === 'choosing') {
+        // Submit timeout when going to background so the other player isn't stuck
+        submitTimeout(gameId).catch(() => {});
+      }
+    });
+    return () => subscription.remove();
+  }, [gameId, game?.status]);
+
   // Listen for game updates
   useEffect(() => {
     const unsub = onGameUpdate(gameId, (g) => {
@@ -97,6 +128,7 @@ export default function GameScreen({ navigation, route }: Props) {
         setSelectedChoice(null);
         setHasChosen(false);
         hasChosenRef.current = false;
+        timeoutFailCountRef.current = 0;
         setTimer(CHOICE_TIMER);
       }
 
@@ -111,6 +143,11 @@ export default function GameScreen({ navigation, route }: Props) {
           [{ text: 'OK', onPress: () => navigation.replace('Home') }]
         );
       }
+    }, (error) => {
+      // Firestore connection lost
+      console.error('Game listener error:', error);
+      setIsOffline(true);
+      isOfflineRef.current = true;
     });
     return unsub;
   }, [gameId, navigation, showDraw, drawSlideAnim]);
@@ -173,6 +210,15 @@ export default function GameScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (timer !== 0 || hasChosenRef.current || !firebaseUser || !game || game.status !== 'choosing') return;
 
+    // If offline or too many failed retries, don't keep trying
+    if (isOfflineRef.current || timeoutFailCountRef.current >= 2) {
+      hasChosenRef.current = true;
+      setHasChosen(true);
+      if (timerRef.current) clearInterval(timerRef.current);
+      // Try stale game cancel when back online (handled by NetInfo listener)
+      return;
+    }
+
     hasChosenRef.current = true;
     setHasChosen(true);
     if (timerRef.current) clearInterval(timerRef.current);
@@ -180,8 +226,12 @@ export default function GameScreen({ navigation, route }: Props) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
 
     submitTimeout(gameId).catch(() => {
-      hasChosenRef.current = false;
-      setHasChosen(false);
+      timeoutFailCountRef.current += 1;
+      // Only allow retry if this is the first failure and we're online
+      if (timeoutFailCountRef.current < 2 && !isOfflineRef.current) {
+        hasChosenRef.current = false;
+        setHasChosen(false);
+      }
     });
   }, [timer, firebaseUser, gameId, game?.status]);
 
@@ -220,6 +270,13 @@ export default function GameScreen({ navigation, route }: Props) {
         }]}>VS {opponent.displayName}</Animated.Text>
         <Text style={styles.betInfo}>Mise : {game.betAmount.toLocaleString()}F</Text>
       </View>
+
+      {isOffline && (
+        <View style={styles.offlineBanner}>
+          <MaterialCommunityIcons name="wifi-off" size={18} color={COLORS.danger} />
+          <Text style={styles.offlineText}>Connexion perdue - reconnexion en cours...</Text>
+        </View>
+      )}
 
       {showDraw && (
         <Animated.View style={[styles.drawBanner, { transform: [{ translateY: drawSlideAnim }] }]}>
@@ -327,6 +384,23 @@ const styles = StyleSheet.create({
     color: COLORS.gold,
     fontWeight: 'bold',
     fontFamily: FONT_FAMILY.bold,
+  },
+  offlineBanner: {
+    backgroundColor: COLORS.danger + '20',
+    borderRadius: 12,
+    padding: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.danger,
+  },
+  offlineText: {
+    color: COLORS.danger,
+    fontSize: 13,
+    fontFamily: FONT_FAMILY.semibold,
+    flex: 1,
   },
   drawBanner: {
     backgroundColor: COLORS.warning + '20',

@@ -85,30 +85,51 @@ export async function getWithdrawalFee(): Promise<{ percent: number }> {
 }
 
 // Real-time listener for available bets
-export function onAvailableBets(callback: (bets: Bet[]) => void) {
+export function onAvailableBets(
+  callback: (bets: Bet[]) => void,
+  onError?: (error: Error) => void
+) {
   const q = query(
     collection(db, 'bets'),
     where('status', '==', 'waiting'),
     orderBy('amount', 'asc')
   );
 
-  return onSnapshot(q, (snap) => {
-    const bets = snap.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    })) as Bet[];
-    callback(bets);
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      const bets = snap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      })) as Bet[];
+      callback(bets);
+    },
+    (error) => {
+      console.error('Bets snapshot error:', error);
+      if (onError) onError(error);
+    }
+  );
 }
 
 // Real-time listener for a specific bet (to detect match)
-export function onBetUpdate(betId: string, callback: (bet: Bet | null) => void) {
+export function onBetUpdate(
+  betId: string,
+  callback: (bet: Bet | null) => void,
+  onError?: (error: Error) => void
+) {
   const betRef = doc(db, 'bets', betId);
-  return onSnapshot(betRef, (snap) => {
-    if (snap.exists()) {
-      callback({ id: snap.id, ...snap.data() } as Bet);
-    } else {
-      callback(null);
+  return onSnapshot(
+    betRef,
+    (snap) => {
+      if (snap.exists()) {
+        callback({ id: snap.id, ...snap.data() } as Bet);
+      } else {
+        callback(null);
+      }
+    },
+    (error) => {
+      console.error('Bet snapshot error:', error);
+      if (onError) onError(error);
     }
-  });
+  );
 }

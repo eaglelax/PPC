@@ -10,6 +10,7 @@ import walletRoutes from './routes/wallet';
 import settingsRoutes from './routes/settings';
 import orangeMoneyRoutes from './routes/orangeMoney';
 import geniusPayRoutes from './routes/geniusPay';
+import { startGameCleanup } from './services/gameCleanup';
 // import paydunyaRoutes from './routes/paydunya'; // Replaced by Orange Money
 
 const app = express();
@@ -39,4 +40,5 @@ app.get('/api/health', (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`PPC API running on port ${PORT}`);
+  startGameCleanup();
 });
