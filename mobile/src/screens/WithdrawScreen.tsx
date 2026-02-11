@@ -5,10 +5,8 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ScrollView,
   ActivityIndicator,
-  Platform,
   Modal,
   FlatList,
 } from 'react-native';
@@ -18,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { withdrawFunds, getWithdrawalFee } from '../services/betService';
 import { COLORS, FONTS, SPACING, FONT_FAMILY } from '../config/theme';
 import { RootStackParamList } from '../types';
+import { showAlert } from '../utils/alert';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
 import { ORANGE_MONEY_COUNTRIES, DEFAULT_COUNTRY, Country } from '../config/countries';
 
@@ -50,36 +49,30 @@ export default function WithdrawScreen({ navigation }: Props) {
   const handleWithdraw = () => {
     if (!userData) return;
     if (numAmount <= 0) {
-      Alert.alert('Erreur', 'Veuillez entrer un montant valide.');
+      showAlert('Erreur', 'Veuillez entrer un montant valide.');
       return;
     }
     if (numAmount < 1000) {
-      Alert.alert('Erreur', 'Le montant minimum de retrait est de 1 000F.');
+      showAlert('Erreur', 'Le montant minimum de retrait est de 1 000F.');
       return;
     }
     if (numAmount > userData.balance) {
-      Alert.alert('Solde insuffisant', `Votre solde est de ${userData.balance.toLocaleString()}F.`);
+      showAlert('Solde insuffisant', `Votre solde est de ${userData.balance.toLocaleString()}F.`);
       return;
     }
     if (!phone || phone.length < 8) {
-      Alert.alert('Erreur', 'Veuillez entrer un numero valide.');
+      showAlert('Erreur', 'Veuillez entrer un numero valide.');
       return;
     }
 
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Confirmer le retrait de ${numAmount.toLocaleString()}F ?\nVous recevrez ${netAmount.toLocaleString()}F (frais ${fee.toLocaleString()}F)`)) {
-        processWithdraw();
-      }
-    } else {
-      Alert.alert(
-        'Confirmer le retrait',
-        `Retirer ${numAmount.toLocaleString()}F ?\nVous recevrez ${netAmount.toLocaleString()}F (frais ${fee.toLocaleString()}F)`,
-        [
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Confirmer', onPress: () => processWithdraw() },
-        ]
-      );
-    }
+    showAlert(
+      'Confirmer le retrait',
+      `Retirer ${numAmount.toLocaleString()}F ?\nVous recevrez ${netAmount.toLocaleString()}F (frais ${fee.toLocaleString()}F)`,
+      [
+        { text: 'Annuler' },
+        { text: 'Confirmer', onPress: () => processWithdraw() },
+      ]
+    );
   };
 
   const processWithdraw = async () => {
@@ -98,15 +91,11 @@ export default function WithdrawScreen({ navigation }: Props) {
         message = `Retrait de ${result.netAmount.toLocaleString()}F enregistre. Transfert traite sous peu.\nFrais: ${result.fee.toLocaleString()}F`;
       }
 
-      if (Platform.OS === 'web') {
-        window.alert(`${title}\n${message}`);
-      } else {
-        Alert.alert(title, message);
-      }
+      showAlert(title, message);
       setAmount('');
       setPhone('');
     } catch (error: any) {
-      Alert.alert('Erreur', error.message);
+      showAlert('Erreur', error.message);
     } finally {
       setLoading(false);
     }

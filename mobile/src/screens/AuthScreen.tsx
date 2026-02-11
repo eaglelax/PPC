@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -18,6 +17,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'fire
 import { auth } from '../config/firebase';
 import { createUser } from '../services/userService';
 import { COLORS, FONTS, SPACING, FONT_FAMILY } from '../config/theme';
+import { showAlert } from '../utils/alert';
 import { ORANGE_MONEY_COUNTRIES, DEFAULT_COUNTRY, Country } from '../config/countries';
 import GradientButton from '../components/GradientButton';
 import LoadingScreen from '../components/LoadingScreen';
@@ -34,19 +34,19 @@ export default function AuthScreen() {
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs.');
+      showAlert('Erreur', 'Veuillez remplir tous les champs.');
       return;
     }
     if (!isLogin && !displayName.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer un pseudo.');
+      showAlert('Erreur', 'Veuillez entrer un pseudo.');
       return;
     }
     if (!isLogin && phone.length < 8) {
-      Alert.alert('Erreur', 'Veuillez entrer un numero de telephone valide.');
+      showAlert('Erreur', 'Veuillez entrer un numero de telephone valide.');
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 6 caracteres.');
+      showAlert('Erreur', 'Le mot de passe doit contenir au moins 6 caracteres.');
       return;
     }
 
@@ -72,7 +72,7 @@ export default function AuthScreen() {
       } else if (error.message) {
         message = error.message;
       }
-      Alert.alert('Erreur', message);
+      showAlert('Erreur', message);
     } finally {
       setLoading(false);
     }

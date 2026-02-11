@@ -7,7 +7,6 @@ import {
   FlatList,
   Modal,
   TextInput,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, FONTS, SPACING, FONT_FAMILY, GRADIENT_COLORS, MIN_BET_AMOUNT, GAME_FEE } from '../config/theme';
 import { RootStackParamList, Bet } from '../types';
+import { showAlert } from '../utils/alert';
 import { onAvailableBets, createBet, joinBet } from '../services/betService';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
 import GradientButton from '../components/GradientButton';
@@ -46,11 +46,11 @@ export default function BetScreen({ navigation }: Props) {
   const handleCreateBet = async () => {
     const amount = parseInt(betAmount, 10);
     if (!amount || amount < MIN_BET_AMOUNT) {
-      Alert.alert('Erreur', `Le montant minimum est de ${MIN_BET_AMOUNT.toLocaleString()}F.`);
+      showAlert('Erreur', `Le montant minimum est de ${MIN_BET_AMOUNT.toLocaleString()}F.`);
       return;
     }
     if (amount + GAME_FEE > userData.balance) {
-      Alert.alert('Solde insuffisant', `Il vous faut ${(amount + GAME_FEE).toLocaleString()}F (mise + frais).`, [
+      showAlert('Solde insuffisant', `Il vous faut ${(amount + GAME_FEE).toLocaleString()}F (mise + frais).`, [
         { text: 'Recharger', onPress: () => navigation.navigate('Recharge') },
         { text: 'Annuler', style: 'cancel' },
       ]);
@@ -64,7 +64,7 @@ export default function BetScreen({ navigation }: Props) {
       setBetAmount('');
       navigation.navigate('Waiting', { betId, betAmount: amount });
     } catch (error: any) {
-      Alert.alert('Erreur', error.message);
+      showAlert('Erreur', error.message);
     } finally {
       setLoading(false);
     }
@@ -72,11 +72,11 @@ export default function BetScreen({ navigation }: Props) {
 
   const handleJoinBet = async (bet: Bet) => {
     if (bet.creatorId === firebaseUser.uid) {
-      Alert.alert('Erreur', 'Vous ne pouvez pas rejoindre votre propre pari.');
+      showAlert('Erreur', 'Vous ne pouvez pas rejoindre votre propre pari.');
       return;
     }
     if (bet.amount + GAME_FEE > userData.balance) {
-      Alert.alert('Solde insuffisant', `Il vous faut ${(bet.amount + GAME_FEE).toLocaleString()}F (mise + frais).`, [
+      showAlert('Solde insuffisant', `Il vous faut ${(bet.amount + GAME_FEE).toLocaleString()}F (mise + frais).`, [
         { text: 'Recharger', onPress: () => navigation.navigate('Recharge') },
         { text: 'Annuler', style: 'cancel' },
       ]);
@@ -88,7 +88,7 @@ export default function BetScreen({ navigation }: Props) {
       const { gameId } = await joinBet(bet.id);
       navigation.replace('Game', { gameId });
     } catch (error: any) {
-      Alert.alert('Erreur', error.message);
+      showAlert('Erreur', error.message);
     } finally {
       setJoining(null);
     }

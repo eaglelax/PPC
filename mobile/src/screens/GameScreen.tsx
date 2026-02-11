@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert, AppState, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, AppState, Platform } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -12,6 +12,7 @@ import { submitChoice, submitTimeout, cancelStaleGame, API_BASE } from '../confi
 import { auth } from '../config/firebase';
 import { COLORS, FONTS, SPACING, FONT_FAMILY, GRADIENT_COLORS, CHOICE_TIMER } from '../config/theme';
 import { RootStackParamList, Choice, Game } from '../types';
+import { showAlert } from '../utils/alert';
 import CircularTimer from '../components/CircularTimer';
 
 type Props = {
@@ -174,9 +175,9 @@ export default function GameScreen({ navigation, route }: Props) {
       }
 
       if (g?.status === 'cancelled') {
-        Alert.alert(
+        showAlert(
           'Partie annulee',
-          'La partie a ete annulee pour inactivite. Vos fonds ont ete rembourses.',
+          'La partie a ete annulee. Votre remboursement sera effectue dans moins de 24h.',
           [{ text: 'OK', onPress: () => navigation.replace('Home') }]
         );
       }
@@ -185,6 +186,11 @@ export default function GameScreen({ navigation, route }: Props) {
       console.error('Game listener error:', error);
       setIsOffline(true);
       isOfflineRef.current = true;
+      showAlert(
+        'Connexion perdue',
+        'La connexion a ete perdue pendant la partie. Votre remboursement sera effectue dans moins de 24h.',
+        [{ text: 'OK', onPress: () => navigation.replace('Home') }]
+      );
     });
     return unsub;
   }, [gameId, navigation, showDraw, drawSlideAnim]);

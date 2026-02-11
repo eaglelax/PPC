@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../config/firebase';
 import { cancelActiveGames } from '../config/api';
 import { COLORS, FONTS, SPACING, FONT_FAMILY } from '../config/theme';
+import { showAlert } from '../utils/alert';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
 
 export default function HomeScreen() {
@@ -22,6 +23,11 @@ export default function HomeScreen() {
         const result = await cancelActiveGames();
         if (result.cancelled?.length > 0) {
           console.log('[Cleanup] Cancelled active games:', result.cancelled);
+          showAlert(
+            'Partie interrompue',
+            'Une partie en cours a ete detectee. Votre remboursement sera effectue dans moins de 24h.',
+            [{ text: 'OK' }]
+          );
         }
       } catch (err) {
         console.error('[Cleanup] Failed (attempt', attempt, '):', err);

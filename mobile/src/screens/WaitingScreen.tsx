@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert, AppState, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, AppState, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';

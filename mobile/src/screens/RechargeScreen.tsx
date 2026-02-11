@@ -5,10 +5,8 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ScrollView,
   ActivityIndicator,
-  Platform,
   Modal,
   FlatList,
   Linking,
@@ -24,6 +22,7 @@ import {
 } from '../config/api';
 import { COLORS, FONTS, SPACING, FONT_FAMILY, MIN_RECHARGE } from '../config/theme';
 import { RootStackParamList } from '../types';
+import { showAlert } from '../utils/alert';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
 import { ORANGE_MONEY_COUNTRIES, DEFAULT_COUNTRY, Country } from '../config/countries';
 import GradientButton from '../components/GradientButton';
@@ -62,11 +61,11 @@ export default function RechargeScreen({ navigation }: Props) {
 
   const handleContinue = () => {
     if (numAmount <= 0) {
-      Alert.alert('Erreur', 'Veuillez entrer un montant valide.');
+      showAlert('Erreur', 'Veuillez entrer un montant valide.');
       return;
     }
     if (numAmount < MIN_RECHARGE) {
-      Alert.alert('Erreur', `Le montant minimum de recharge est de ${MIN_RECHARGE.toLocaleString()}F.`);
+      showAlert('Erreur', `Le montant minimum de recharge est de ${MIN_RECHARGE.toLocaleString()}F.`);
       return;
     }
     setStep('method');
@@ -76,28 +75,22 @@ export default function RechargeScreen({ navigation }: Props) {
 
   const handleOmPay = () => {
     if (phone.length < 8) {
-      Alert.alert('Erreur', 'Veuillez entrer un numero de telephone valide (8+ chiffres).');
+      showAlert('Erreur', 'Veuillez entrer un numero de telephone valide (8+ chiffres).');
       return;
     }
     if (otp.length !== 4) {
-      Alert.alert('Erreur', 'Le code OTP doit contenir 4 chiffres.');
+      showAlert('Erreur', 'Le code OTP doit contenir 4 chiffres.');
       return;
     }
 
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Confirmer la recharge de ${numAmount.toLocaleString()}F via Orange Money ?`)) {
-        processOmRecharge();
-      }
-    } else {
-      Alert.alert(
-        'Confirmer la recharge',
-        `Recharger ${numAmount.toLocaleString()}F via Orange Money ?`,
-        [
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Confirmer', onPress: () => processOmRecharge() },
-        ]
-      );
-    }
+    showAlert(
+      'Confirmer la recharge',
+      `Recharger ${numAmount.toLocaleString()}F via Orange Money ?`,
+      [
+        { text: 'Annuler' },
+        { text: 'Confirmer', onPress: () => processOmRecharge() },
+      ]
+    );
   };
 
   const processOmRecharge = async () => {
@@ -108,15 +101,11 @@ export default function RechargeScreen({ navigation }: Props) {
     try {
       await payWithOrangeMoney(numAmount, fullPhone, otp);
       resetForm();
-      if (Platform.OS === 'web') {
-        window.alert(`Recharge reussie ! +${numAmount.toLocaleString()}F ajoutes a votre solde.`);
-      } else {
-        Alert.alert('Recharge reussie !', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`);
-      }
+      showAlert('Recharge reussie !', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`);
     } catch (error: any) {
       setStep('om-details');
       setLoading(false);
-      Alert.alert('Erreur', error.message || 'Le paiement a echoue. Veuillez reessayer.');
+      showAlert('Erreur', error.message || 'Le paiement a echoue. Veuillez reessayer.');
     }
   };
 
@@ -133,7 +122,7 @@ export default function RechargeScreen({ navigation }: Props) {
       setLoading(false);
     } catch (error: any) {
       setLoading(false);
-      Alert.alert('Erreur', error.message || 'Impossible d\'initier le paiement.');
+      showAlert('Erreur', error.message || 'Impossible d\'initier le paiement.');
     }
   };
 
@@ -142,7 +131,7 @@ export default function RechargeScreen({ navigation }: Props) {
       try {
         await Linking.openURL(geniusCheckoutUrl);
       } catch {
-        Alert.alert('Erreur', 'Impossible d\'ouvrir le lien de paiement.');
+        showAlert('Erreur', 'Impossible d\'ouvrir le lien de paiement.');
       }
     }
   };
@@ -157,12 +146,12 @@ export default function RechargeScreen({ navigation }: Props) {
           if (pollInterval.current) clearInterval(pollInterval.current);
           pollInterval.current = null;
           resetForm();
-          Alert.alert('Recharge reussie !', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`);
+          showAlert('Recharge reussie !', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`);
         } else if (result.status === 'failed' || result.status === 'expired') {
           if (pollInterval.current) clearInterval(pollInterval.current);
           pollInterval.current = null;
           setStep('method');
-          Alert.alert('Erreur', 'Le paiement a echoue ou a expire. Veuillez reessayer.');
+          showAlert('Erreur', 'Le paiement a echoue ou a expire. Veuillez reessayer.');
         }
       } catch {
         // Silently retry on next interval
@@ -177,16 +166,16 @@ export default function RechargeScreen({ navigation }: Props) {
       setLoading(false);
       if (result.status === 'completed') {
         resetForm();
-        Alert.alert('Recharge reussie !', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`);
+        showAlert('Recharge reussie !', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`);
       } else if (result.status === 'failed' || result.status === 'expired') {
         setStep('method');
-        Alert.alert('Erreur', 'Le paiement a echoue ou a expire.');
+        showAlert('Erreur', 'Le paiement a echoue ou a expire.');
       } else {
-        Alert.alert('En attente', 'Le paiement est toujours en cours de traitement.');
+        showAlert('En attente', 'Le paiement est toujours en cours de traitement.');
       }
     } catch (error: any) {
       setLoading(false);
-      Alert.alert('Erreur', error.message || 'Impossible de verifier le statut.');
+      showAlert('Erreur', error.message || 'Impossible de verifier le statut.');
     }
   };
 
@@ -196,10 +185,10 @@ export default function RechargeScreen({ navigation }: Props) {
     try {
       await completeGeniusDemoPayment(geniusRef);
       resetForm();
-      Alert.alert('Recharge reussie ! (demo)', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`);
+      showAlert('Recharge reussie ! (demo)', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`);
     } catch (error: any) {
       setLoading(false);
-      Alert.alert('Erreur', error.message || 'Erreur de simulation.');
+      showAlert('Erreur', error.message || 'Erreur de simulation.');
     }
   };
 
