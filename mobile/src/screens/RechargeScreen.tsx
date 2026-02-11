@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,17 @@ import {
   Platform,
   Modal,
   FlatList,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
-import { payWithOrangeMoney } from '../config/api';
+import {
+  payWithOrangeMoney,
+  initiateGeniusPayment,
+  getGeniusPaymentStatus,
+  completeGeniusDemoPayment,
+} from '../config/api';
 import { COLORS, FONTS, SPACING, FONT_FAMILY, MIN_RECHARGE } from '../config/theme';
 import { RootStackParamList } from '../types';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
@@ -26,7 +32,7 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Recharge'>;
 };
 
-type Step = 'amount' | 'details' | 'processing';
+type Step = 'amount' | 'method' | 'om-details' | 'genius-checkout' | 'processing';
 
 export default function RechargeScreen({ navigation }: Props) {
   const { userData } = useAuth();
@@ -38,8 +44,21 @@ export default function RechargeScreen({ navigation }: Props) {
   const [step, setStep] = useState<Step>('amount');
   const [loading, setLoading] = useState(false);
 
+  // GeniusPay state
+  const [geniusRef, setGeniusRef] = useState('');
+  const [geniusCheckoutUrl, setGeniusCheckoutUrl] = useState('');
+  const [geniusMode, setGeniusMode] = useState<'live' | 'demo'>('demo');
+  const pollInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const numAmount = parseInt(amount, 10) || 0;
   const quickAmounts = [1010, 2000, 5000, 10000];
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollInterval.current) clearInterval(pollInterval.current);
+    };
+  }, []);
 
   const handleContinue = () => {
     if (numAmount <= 0) {
@@ -50,10 +69,12 @@ export default function RechargeScreen({ navigation }: Props) {
       Alert.alert('Erreur', `Le montant minimum de recharge est de ${MIN_RECHARGE.toLocaleString()}F.`);
       return;
     }
-    setStep('details');
+    setStep('method');
   };
 
-  const handlePay = () => {
+  // ── Orange Money Flow ──
+
+  const handleOmPay = () => {
     if (phone.length < 8) {
       Alert.alert('Erreur', 'Veuillez entrer un numero de telephone valide (8+ chiffres).');
       return;
@@ -65,7 +86,7 @@ export default function RechargeScreen({ navigation }: Props) {
 
     if (Platform.OS === 'web') {
       if (window.confirm(`Confirmer la recharge de ${numAmount.toLocaleString()}F via Orange Money ?`)) {
-        processRecharge();
+        processOmRecharge();
       }
     } else {
       Alert.alert(
@@ -73,33 +94,126 @@ export default function RechargeScreen({ navigation }: Props) {
         `Recharger ${numAmount.toLocaleString()}F via Orange Money ?`,
         [
           { text: 'Annuler', style: 'cancel' },
-          { text: 'Confirmer', onPress: () => processRecharge() },
+          { text: 'Confirmer', onPress: () => processOmRecharge() },
         ]
       );
     }
   };
 
-  const processRecharge = async () => {
+  const processOmRecharge = async () => {
     setLoading(true);
     setStep('processing');
     const fullPhone = country.dialCode + phone;
 
     try {
       await payWithOrangeMoney(numAmount, fullPhone, otp);
-      setStep('amount');
-      setLoading(false);
-      setAmount('');
-      setPhone('');
-      setOtp('');
+      resetForm();
       if (Platform.OS === 'web') {
         window.alert(`Recharge reussie ! +${numAmount.toLocaleString()}F ajoutes a votre solde.`);
       } else {
         Alert.alert('Recharge reussie !', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`);
       }
     } catch (error: any) {
-      setStep('details');
+      setStep('om-details');
       setLoading(false);
       Alert.alert('Erreur', error.message || 'Le paiement a echoue. Veuillez reessayer.');
+    }
+  };
+
+  // ── GeniusPay Flow ──
+
+  const handleGeniusPay = async () => {
+    setLoading(true);
+    try {
+      const result = await initiateGeniusPayment(numAmount);
+      setGeniusRef(result.reference);
+      setGeniusCheckoutUrl(result.checkout_url);
+      setGeniusMode(result.mode);
+      setStep('genius-checkout');
+      setLoading(false);
+    } catch (error: any) {
+      setLoading(false);
+      Alert.alert('Erreur', error.message || 'Impossible d\'initier le paiement.');
+    }
+  };
+
+  const openCheckout = async () => {
+    if (geniusCheckoutUrl) {
+      try {
+        await Linking.openURL(geniusCheckoutUrl);
+      } catch {
+        Alert.alert('Erreur', 'Impossible d\'ouvrir le lien de paiement.');
+      }
+    }
+  };
+
+  const startPolling = () => {
+    if (pollInterval.current) clearInterval(pollInterval.current);
+
+    pollInterval.current = setInterval(async () => {
+      try {
+        const result = await getGeniusPaymentStatus(geniusRef);
+        if (result.status === 'completed') {
+          if (pollInterval.current) clearInterval(pollInterval.current);
+          pollInterval.current = null;
+          resetForm();
+          Alert.alert('Recharge reussie !', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`);
+        } else if (result.status === 'failed' || result.status === 'expired') {
+          if (pollInterval.current) clearInterval(pollInterval.current);
+          pollInterval.current = null;
+          setStep('method');
+          Alert.alert('Erreur', 'Le paiement a echoue ou a expire. Veuillez reessayer.');
+        }
+      } catch {
+        // Silently retry on next interval
+      }
+    }, 5000);
+  };
+
+  const handleCheckPaymentStatus = async () => {
+    setLoading(true);
+    try {
+      const result = await getGeniusPaymentStatus(geniusRef);
+      setLoading(false);
+      if (result.status === 'completed') {
+        resetForm();
+        Alert.alert('Recharge reussie !', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`);
+      } else if (result.status === 'failed' || result.status === 'expired') {
+        setStep('method');
+        Alert.alert('Erreur', 'Le paiement a echoue ou a expire.');
+      } else {
+        Alert.alert('En attente', 'Le paiement est toujours en cours de traitement.');
+      }
+    } catch (error: any) {
+      setLoading(false);
+      Alert.alert('Erreur', error.message || 'Impossible de verifier le statut.');
+    }
+  };
+
+  // Demo mode: simulate completed payment
+  const handleDemoComplete = async () => {
+    setLoading(true);
+    try {
+      await completeGeniusDemoPayment(geniusRef);
+      resetForm();
+      Alert.alert('Recharge reussie ! (demo)', `+${numAmount.toLocaleString()}F ajoutes a votre solde.`);
+    } catch (error: any) {
+      setLoading(false);
+      Alert.alert('Erreur', error.message || 'Erreur de simulation.');
+    }
+  };
+
+  const resetForm = () => {
+    setStep('amount');
+    setLoading(false);
+    setAmount('');
+    setPhone('');
+    setOtp('');
+    setGeniusRef('');
+    setGeniusCheckoutUrl('');
+    if (pollInterval.current) {
+      clearInterval(pollInterval.current);
+      pollInterval.current = null;
     }
   };
 
@@ -116,6 +230,7 @@ export default function RechargeScreen({ navigation }: Props) {
           <Text style={styles.balanceValue}>{userData?.balance.toLocaleString()}F</Text>
         </View>
 
+        {/* ── Step 1: Amount ── */}
         {step === 'amount' && (
           <>
             <Text style={styles.label}>Montant de la recharge (min {MIN_RECHARGE.toLocaleString()}F)</Text>
@@ -167,12 +282,62 @@ export default function RechargeScreen({ navigation }: Props) {
           </>
         )}
 
-        {step === 'details' && (
+        {/* ── Step 2: Payment Method ── */}
+        {step === 'method' && (
           <>
             <View style={styles.amountBadge}>
               <Text style={styles.amountBadgeText}>Montant : {numAmount.toLocaleString()}F</Text>
               <TouchableOpacity onPress={() => setStep('amount')}>
                 <Text style={styles.changeLink}>Modifier</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.sectionTitle}>Choisir un moyen de paiement</Text>
+
+            {/* GeniusPay - Multi-method */}
+            <TouchableOpacity
+              style={styles.methodCard}
+              onPress={handleGeniusPay}
+              disabled={loading}
+            >
+              <View style={styles.methodIconContainer}>
+                <Ionicons name="card-outline" size={28} color={COLORS.primary} />
+              </View>
+              <View style={styles.methodInfo}>
+                <Text style={styles.methodName}>GeniusPay</Text>
+                <Text style={styles.methodDesc}>Wave, Orange Money, MTN, Carte bancaire</Text>
+              </View>
+              {loading ? (
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              ) : (
+                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+              )}
+            </TouchableOpacity>
+
+            {/* Orange Money Direct */}
+            <TouchableOpacity
+              style={styles.methodCard}
+              onPress={() => setStep('om-details')}
+            >
+              <View style={[styles.methodIconContainer, { backgroundColor: '#FF6600' + '20' }]}>
+                <Ionicons name="phone-portrait-outline" size={28} color="#FF6600" />
+              </View>
+              <View style={styles.methodInfo}>
+                <Text style={styles.methodName}>Orange Money Direct</Text>
+                <Text style={styles.methodDesc}>Paiement avec code OTP</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* ── Step 3a: Orange Money Details ── */}
+        {step === 'om-details' && (
+          <>
+            <View style={styles.amountBadge}>
+              <Text style={styles.amountBadgeText}>Montant : {numAmount.toLocaleString()}F</Text>
+              <TouchableOpacity onPress={() => setStep('method')}>
+                <Text style={styles.changeLink}>Changer</Text>
               </TouchableOpacity>
             </View>
 
@@ -215,8 +380,8 @@ export default function RechargeScreen({ navigation }: Props) {
             </View>
 
             <TouchableOpacity
-              style={[styles.button, styles.omButton, (phone.length < 8 || otp.length !== 4) && styles.buttonDisabled]}
-              onPress={handlePay}
+              style={[styles.omButton, (phone.length < 8 || otp.length !== 4) && styles.buttonDisabled]}
+              onPress={handleOmPay}
               disabled={phone.length < 8 || otp.length !== 4}
             >
               <Ionicons name="phone-portrait-outline" size={20} color={COLORS.text} />
@@ -225,6 +390,83 @@ export default function RechargeScreen({ navigation }: Props) {
           </>
         )}
 
+        {/* ── Step 3b: GeniusPay Checkout ── */}
+        {step === 'genius-checkout' && (
+          <>
+            <View style={styles.amountBadge}>
+              <Text style={styles.amountBadgeText}>Montant : {numAmount.toLocaleString()}F</Text>
+            </View>
+
+            <View style={styles.geniusCheckoutCard}>
+              <Ionicons name="card-outline" size={40} color={COLORS.primary} />
+              <Text style={styles.geniusTitle}>Paiement GeniusPay</Text>
+
+              <Text style={styles.geniusSubtext}>
+                {geniusMode === 'demo'
+                  ? 'Mode demo - Simulez un paiement pour tester.'
+                  : 'Ouvrez la page de paiement securisee GeniusPay.'}
+              </Text>
+
+              {geniusMode === 'live' && (
+                <GradientButton
+                  title="Ouvrir le paiement"
+                  onPress={() => {
+                    openCheckout();
+                    startPolling();
+                  }}
+                />
+              )}
+
+              {geniusMode === 'live' && (
+                <TouchableOpacity
+                  style={styles.checkStatusBtn}
+                  onPress={handleCheckPaymentStatus}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                  ) : (
+                    <>
+                      <Ionicons name="refresh-outline" size={18} color={COLORS.primary} />
+                      <Text style={styles.checkStatusText}>Verifier le statut</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+
+              {/* Simulate button: shown in both demo and sandbox (webhooks can't reach localhost) */}
+              <View style={styles.demoBanner}>
+                <Ionicons name="flask-outline" size={16} color={COLORS.gold} />
+                <Text style={styles.demoText}>
+                  {geniusMode === 'demo' ? 'Mode demo' : 'Mode sandbox'}
+                </Text>
+              </View>
+
+              <GradientButton
+                title={loading ? 'Traitement...' : 'Valider le paiement'}
+                onPress={handleDemoComplete}
+                disabled={loading}
+              />
+
+              <Text style={styles.geniusRef}>Ref: {geniusRef}</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.cancelLink}
+              onPress={() => {
+                if (pollInterval.current) {
+                  clearInterval(pollInterval.current);
+                  pollInterval.current = null;
+                }
+                setStep('method');
+              }}
+            >
+              <Text style={styles.cancelLinkText}>Annuler et choisir un autre moyen</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* ── Processing ── */}
         {step === 'processing' && (
           <View style={styles.processingContainer}>
             <ActivityIndicator size="large" color={COLORS.gold} />
@@ -397,6 +639,49 @@ const styles = StyleSheet.create({
     fontSize: FONTS.regular,
     fontFamily: FONT_FAMILY.regular,
   },
+  // ── Payment Method Selection ──
+  sectionTitle: {
+    color: COLORS.text,
+    fontSize: FONTS.medium,
+    fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
+    marginBottom: SPACING.md,
+  },
+  methodCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    gap: SPACING.md,
+  },
+  methodIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  methodInfo: {
+    flex: 1,
+  },
+  methodName: {
+    color: COLORS.text,
+    fontSize: FONTS.regular,
+    fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
+  },
+  methodDesc: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
+    fontFamily: FONT_FAMILY.regular,
+    marginTop: 2,
+  },
+  // ── Orange Money ──
   omButton: {
     flexDirection: 'row',
     gap: SPACING.sm,
@@ -436,6 +721,7 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontSize: FONTS.regular,
     textDecorationLine: 'underline',
+    fontFamily: FONT_FAMILY.regular,
   },
   otpHint: {
     flexDirection: 'row',
@@ -452,6 +738,85 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: FONT_FAMILY.regular,
   },
+  // ── GeniusPay Checkout ──
+  geniusCheckoutCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    padding: SPACING.xl,
+    alignItems: 'center',
+    gap: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  geniusTitle: {
+    color: COLORS.text,
+    fontSize: FONTS.large,
+    fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
+  },
+  geniusSubtext: {
+    color: COLORS.textSecondary,
+    fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
+    textAlign: 'center',
+    marginBottom: SPACING.sm,
+  },
+  checkStatusBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.sm,
+  },
+  checkStatusText: {
+    color: COLORS.primary,
+    fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
+  },
+  demoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.gold + '15',
+    borderRadius: 10,
+    padding: SPACING.md,
+    width: '100%',
+    marginTop: SPACING.sm,
+  },
+  demoText: {
+    color: COLORS.gold,
+    fontSize: 13,
+    fontFamily: FONT_FAMILY.regular,
+    flex: 1,
+  },
+  demoCompleteBtn: {
+    backgroundColor: COLORS.gold,
+    borderRadius: 8,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+  },
+  demoCompleteBtnText: {
+    color: COLORS.background,
+    fontSize: 13,
+    fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
+  },
+  geniusRef: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    fontFamily: FONT_FAMILY.regular,
+    marginTop: SPACING.sm,
+  },
+  cancelLink: {
+    alignItems: 'center',
+    paddingVertical: SPACING.lg,
+  },
+  cancelLinkText: {
+    color: COLORS.primary,
+    fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
+    textDecorationLine: 'underline',
+  },
+  // ── Processing ──
   processingContainer: {
     alignItems: 'center',
     paddingVertical: SPACING.xxl,
@@ -469,6 +834,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: FONT_FAMILY.regular,
   },
+  // ── Phone / Country ──
   phoneRow: {
     flexDirection: 'row',
     gap: SPACING.sm,
@@ -503,6 +869,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  // ── Modal ──
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',

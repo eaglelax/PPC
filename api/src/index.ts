@@ -9,6 +9,7 @@ import betRoutes from './routes/bets';
 import walletRoutes from './routes/wallet';
 import settingsRoutes from './routes/settings';
 import orangeMoneyRoutes from './routes/orangeMoney';
+import geniusPayRoutes from './routes/geniusPay';
 // import paydunyaRoutes from './routes/paydunya'; // Replaced by Orange Money
 
 const app = express();
@@ -28,6 +29,7 @@ app.use('/api/bets', betRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/orange-money', orangeMoneyRoutes);
+app.use('/api/genius-pay', geniusPayRoutes);
 // app.use('/api/payments/paydunya', paydunyaRoutes); // Replaced by Orange Money
 
 // Health check

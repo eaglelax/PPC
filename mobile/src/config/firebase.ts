@@ -13,7 +13,7 @@ const firebaseConfig = {
   measurementId: "G-JRWKGPX1KF"
 };
 
-const USE_EMULATORS = __DEV__;
+const USE_EMULATORS = false; // Set to __DEV__ to use local emulators
 const EMULATOR_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 
 const app = initializeApp(firebaseConfig);
