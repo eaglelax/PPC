@@ -107,30 +107,42 @@ export default function GameScreen({ navigation, route }: Props) {
     return () => subscription.remove();
   }, [gameId, game?.status]);
 
-  // Web: detect page reload/close and send timeout via beacon
+  // Web: cache auth token for synchronous access during beforeunload
+  const cachedTokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const refreshToken = () => {
+      const user = auth.currentUser;
+      if (user) {
+        user.getIdToken().then((t) => { cachedTokenRef.current = t; }).catch(() => {});
+      }
+    };
+    refreshToken();
+    // Refresh token every 10 minutes (tokens last 1h)
+    const interval = setInterval(refreshToken, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Web: detect page reload/close and cancel active games immediately
   useEffect(() => {
     if (Platform.OS !== 'web') return;
 
     const handleBeforeUnload = () => {
-      const user = auth.currentUser;
-      if (!user) return;
-      // Use sendBeacon for reliability during page unload
-      user.getIdToken().then((token) => {
-        const url = `${API_BASE}/games/${gameId}/timeout`;
-        const blob = new Blob([JSON.stringify({})], { type: 'application/json' });
-        // sendBeacon doesn't support auth headers, use fetch with keepalive instead
-        fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({}),
-          keepalive: true,
-        }).catch(() => {});
+      const token = cachedTokenRef.current;
+      if (!token) return;
+      // Call cancel-active to cancel all games and refund both players
+      const url = `${API_BASE}/games/cancel-active`;
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({}),
+        keepalive: true,
       }).catch(() => {});
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [gameId]);
+  }, []);
 
   // Listen for game updates
   useEffect(() => {

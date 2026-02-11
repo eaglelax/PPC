@@ -16,7 +16,21 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!firebaseUser || cleanupDone.current) return;
     cleanupDone.current = true;
-    cancelActiveGames().catch(() => {});
+
+    const doCleanup = async (attempt = 1) => {
+      try {
+        const result = await cancelActiveGames();
+        if (result.cancelled?.length > 0) {
+          console.log('[Cleanup] Cancelled active games:', result.cancelled);
+        }
+      } catch (err) {
+        console.error('[Cleanup] Failed (attempt', attempt, '):', err);
+        if (attempt < 3) {
+          setTimeout(() => doCleanup(attempt + 1), 2000);
+        }
+      }
+    };
+    doCleanup();
   }, [firebaseUser]);
 
   if (!userData) return null;

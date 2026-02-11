@@ -109,17 +109,23 @@ export async function makeChoice(gameId: string, userId: string, choice: Choice)
   }
 
   if (result.status === 'draw') {
-    // Reset choices after delay for next round
+    // Reset choices after delay for next round (use transaction to avoid overwriting cancelled)
     setTimeout(async () => {
       try {
-        await gameRef.update({
-          status: 'choosing',
-          'player1.choice': null,
-          'player2.choice': null,
-          choosingStartedAt: new Date(),
+        await db.runTransaction(async (transaction) => {
+          const snap = await transaction.get(gameRef);
+          if (!snap.exists) return;
+          const current = snap.data()!;
+          if (current.status !== 'draw') return; // Don't overwrite cancelled/resolved
+          transaction.update(gameRef, {
+            status: 'choosing',
+            'player1.choice': null,
+            'player2.choice': null,
+            choosingStartedAt: new Date(),
+          });
         });
       } catch {
-        // Game may have been deleted
+        // Game may have been deleted/cancelled
       }
     }, 2000);
   }
@@ -207,15 +213,21 @@ export async function handleTimeout(gameId: string, userId: string) {
     return result;
   }
 
-  // Draw-like reset: after 2s go back to choosing
+  // Draw-like reset: after 2s go back to choosing (use transaction to avoid overwriting cancelled)
   if (result.status === 'draw') {
     setTimeout(async () => {
       try {
-        await gameRef.update({
-          status: 'choosing',
-          'player1.choice': null,
-          'player2.choice': null,
-          choosingStartedAt: new Date(),
+        await db.runTransaction(async (transaction) => {
+          const snap = await transaction.get(gameRef);
+          if (!snap.exists) return;
+          const current = snap.data()!;
+          if (current.status !== 'draw') return; // Don't overwrite cancelled/resolved
+          transaction.update(gameRef, {
+            status: 'choosing',
+            'player1.choice': null,
+            'player2.choice': null,
+            choosingStartedAt: new Date(),
+          });
         });
       } catch {
         // Game may have been deleted/cancelled
