@@ -87,13 +87,21 @@ export default function WithdrawScreen({ navigation }: Props) {
     const fullPhone = country.dialCode + phone;
     try {
       const result = await withdrawFunds(numAmount, 'Orange', fullPhone);
-      if (Platform.OS === 'web') {
-        window.alert(`Retrait effectue ! ${result.netAmount.toLocaleString()}F envoyes sur Orange Money (${fullPhone})\nFrais: ${result.fee.toLocaleString()}F`);
+
+      let title: string;
+      let message: string;
+      if (result.payoutStatus === 'processing') {
+        title = 'Retrait en cours';
+        message = `Vous recevrez ${result.netAmount.toLocaleString()}F sur ${fullPhone}.\nFrais: ${result.fee.toLocaleString()}F`;
       } else {
-        Alert.alert(
-          'Retrait effectue',
-          `${result.netAmount.toLocaleString()}F envoyes sur Orange Money (${fullPhone})\nFrais: ${result.fee.toLocaleString()}F`
-        );
+        title = 'Retrait enregistre';
+        message = `Retrait de ${result.netAmount.toLocaleString()}F enregistre. Transfert traite sous peu.\nFrais: ${result.fee.toLocaleString()}F`;
+      }
+
+      if (Platform.OS === 'web') {
+        window.alert(`${title}\n${message}`);
+      } else {
+        Alert.alert(title, message);
       }
       setAmount('');
       setPhone('');

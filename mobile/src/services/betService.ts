@@ -66,7 +66,7 @@ export async function withdrawFunds(
   amount: number,
   method: string,
   phone: string
-): Promise<{ amount: number; fee: number; netAmount: number }> {
+): Promise<{ amount: number; fee: number; netAmount: number; payoutStatus?: string; payoutReference?: string }> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_BASE}/wallet/withdraw`, {
     method: 'POST',

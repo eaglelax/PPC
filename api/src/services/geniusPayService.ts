@@ -43,6 +43,23 @@ export interface GeniusPayment {
   created_at: string;
 }
 
+export interface CreateDisbursementParams {
+  amount: number;
+  currency?: string;
+  phone: string;
+  description: string;
+  metadata?: Record<string, string>;
+}
+
+export interface GeniusDisbursement {
+  reference: string;
+  amount: number;
+  currency: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  phone: string;
+  created_at: string;
+}
+
 export interface GeniusWebhookPayload {
   event: string;
   data: {
@@ -153,6 +170,39 @@ export async function createPayment(
   };
 }
 
+// ─── Create Disbursement (Payout) ─────────────────────────────────────────
+
+export async function createDisbursement(
+  config: GeniusPayConfig,
+  params: CreateDisbursementParams
+): Promise<GeniusDisbursement> {
+  try {
+    const response = await geniusRequest(config, 'POST', '/disbursements', {
+      amount: params.amount,
+      currency: params.currency || 'XOF',
+      phone: params.phone,
+      description: params.description,
+      metadata: params.metadata,
+    });
+
+    const d = response.data || response;
+    return {
+      reference: d.reference,
+      amount: d.amount,
+      currency: d.currency || 'XOF',
+      status: d.status || 'processing',
+      phone: params.phone,
+      created_at: d.created_at || new Date().toISOString(),
+    };
+  } catch (error: any) {
+    // If endpoint doesn't exist (404) or unsupported, let caller handle gracefully
+    if (error instanceof GeniusPayError) {
+      throw error;
+    }
+    throw new GeniusPayError(error.message || 'Erreur payout GeniusPay', 500);
+  }
+}
+
 // ─── Get Payment Status ────────────────────────────────────────────────────
 
 export async function getPaymentStatus(
@@ -212,6 +262,18 @@ export function completeDemoPayment(reference: string, amount: number): GeniusPa
     status: 'completed',
     payment_method: 'demo',
     checkout_url: '',
+    created_at: new Date().toISOString(),
+  };
+}
+
+export function createDemoDisbursement(amount: number, phone: string): GeniusDisbursement {
+  demoPaymentCounter++;
+  return {
+    reference: `DEMO-DIS-${Date.now()}-${demoPaymentCounter}`,
+    amount,
+    currency: 'XOF',
+    status: 'processing',
+    phone,
     created_at: new Date().toISOString(),
   };
 }

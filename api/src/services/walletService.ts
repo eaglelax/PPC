@@ -3,6 +3,12 @@ import { MIN_WITHDRAWAL } from '../config/constants';
 import { getUser, updateBalance } from './userService';
 import { createTransaction } from './transactionService';
 import { recordFee } from './feeService';
+import {
+  createDisbursement,
+  createDemoDisbursement,
+  getGeniusPayConfig,
+  isGeniusPayEnabled,
+} from './geniusPayService';
 
 const SETTINGS = 'settings';
 const DEFAULT_WITHDRAWAL_FEE_PERCENT = 2;
@@ -38,5 +44,44 @@ export async function withdraw(userId: string, amount: number, method: string, p
     await recordFee(userId, 'withdrawal_fee', fee);
   }
 
-  return { amount, fee, netAmount, method, phone };
+  // Initiate payout via GeniusPay
+  let payoutStatus: 'processing' | 'pending_manual' = 'pending_manual';
+  let payoutReference = '';
+
+  if (isGeniusPayEnabled()) {
+    try {
+      const config = getGeniusPayConfig();
+      const disbursement = await createDisbursement(config, {
+        amount: netAmount,
+        phone,
+        description: `Retrait P2C - ${netAmount}F`,
+        metadata: { userId, type: 'withdrawal' },
+      });
+      payoutReference = disbursement.reference;
+      payoutStatus = 'processing';
+    } catch (error: any) {
+      console.error('[Withdraw] GeniusPay disbursement failed, marking as pending_manual:', error.message);
+      payoutStatus = 'pending_manual';
+    }
+  } else {
+    // Demo mode
+    const demo = createDemoDisbursement(netAmount, phone);
+    payoutReference = demo.reference;
+    payoutStatus = 'processing';
+  }
+
+  // Save withdrawal record to Firestore
+  await db.collection('withdrawals').doc(payoutReference || `WD-${Date.now()}`).set({
+    userId,
+    amount,
+    fee,
+    netAmount,
+    phone,
+    method,
+    payoutReference,
+    payoutStatus,
+    createdAt: new Date(),
+  });
+
+  return { amount, fee, netAmount, method, phone, payoutStatus, payoutReference };
 }

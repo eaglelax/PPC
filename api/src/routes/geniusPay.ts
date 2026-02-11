@@ -16,6 +16,8 @@ import {
   GeniusPayError,
 } from '../services/geniusPayService';
 import { MIN_RECHARGE } from '../config/constants';
+import { db } from '../config/firebase';
+import { updateBalance, getUser } from '../services/userService';
 
 const router = Router();
 
@@ -270,12 +272,65 @@ router.post('/webhook', async (req: Request, res: Response) => {
       }
     }
 
+    // ── Cashout (disbursement) webhooks ──
+    if (event === 'cashout.completed' && data?.reference) {
+      await handleCashoutCompleted(data.reference);
+    }
+    if (event === 'cashout.failed' && data?.reference) {
+      await handleCashoutFailed(data.reference);
+    }
+
     res.json({ received: true });
   } catch (error: any) {
     console.error('[GeniusPay] Webhook error:', error);
     res.json({ received: true, error: error.message });
   }
 });
+
+// ─── Cashout Webhook Helpers ───────────────────────────────────────────────
+
+async function handleCashoutCompleted(reference: string) {
+  try {
+    const snap = await db.collection('withdrawals').doc(reference).get();
+    if (!snap.exists) {
+      console.warn(`[GeniusPay] Cashout completed but withdrawal ${reference} not found`);
+      return;
+    }
+    await db.collection('withdrawals').doc(reference).update({
+      payoutStatus: 'completed',
+      completedAt: new Date(),
+    });
+    console.log(`[GeniusPay] Webhook: Cashout ${reference} completed`);
+  } catch (error: any) {
+    console.error(`[GeniusPay] Error handling cashout.completed for ${reference}:`, error.message);
+  }
+}
+
+async function handleCashoutFailed(reference: string) {
+  try {
+    const snap = await db.collection('withdrawals').doc(reference).get();
+    if (!snap.exists) {
+      console.warn(`[GeniusPay] Cashout failed but withdrawal ${reference} not found`);
+      return;
+    }
+    const withdrawal = snap.data()!;
+
+    // Mark as failed
+    await db.collection('withdrawals').doc(reference).update({
+      payoutStatus: 'failed',
+      failedAt: new Date(),
+    });
+
+    // Refund the player (full amount, not net — they get the fee back too)
+    const user = await getUser(withdrawal.userId);
+    if (user) {
+      await updateBalance(withdrawal.userId, user.balance + withdrawal.amount);
+      console.log(`[GeniusPay] Webhook: Cashout ${reference} failed — refunded ${withdrawal.amount}F to ${withdrawal.userId}`);
+    }
+  } catch (error: any) {
+    console.error(`[GeniusPay] Error handling cashout.failed for ${reference}:`, error.message);
+  }
+}
 
 // ─── GET /api/genius-pay/return ────────────────────────────────────────────
 
