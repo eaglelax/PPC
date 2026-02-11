@@ -1,14 +1,23 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../config/firebase';
+import { cancelActiveGames } from '../config/api';
 import { COLORS, FONTS, SPACING, FONT_FAMILY } from '../config/theme';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
 
 export default function HomeScreen() {
-  const { userData } = useAuth();
+  const { userData, firebaseUser } = useAuth();
+  const cleanupDone = useRef(false);
+
+  // On mount, cancel any orphaned active games (e.g. after page reload)
+  useEffect(() => {
+    if (!firebaseUser || cleanupDone.current) return;
+    cleanupDone.current = true;
+    cancelActiveGames().catch(() => {});
+  }, [firebaseUser]);
 
   if (!userData) return null;
 

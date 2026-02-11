@@ -1,11 +1,21 @@
 import { Router } from 'express';
 import { AuthRequest, verifyToken } from '../middleware/auth';
-import { getGame, makeChoice, handleTimeout, cancelStaleGame } from '../services/gameService';
+import { getGame, makeChoice, handleTimeout, cancelStaleGame, cancelActiveGamesForUser } from '../services/gameService';
 import { Choice } from '../config/constants';
 
 const router = Router();
 
 const VALID_CHOICES: Choice[] = ['pierre', 'papier', 'ciseaux'];
+
+// POST /api/games/cancel-active — cancel all active games for current user (MUST be before /:id routes)
+router.post('/cancel-active', verifyToken, async (req: AuthRequest, res) => {
+  try {
+    const result = await cancelActiveGamesForUser(req.uid!);
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
 
 // GET /api/games/:id
 router.get('/:id', verifyToken, async (req: AuthRequest, res) => {

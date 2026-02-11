@@ -274,6 +274,50 @@ export async function cancelStaleGame(gameId: string, userId: string) {
   return { status: 'cancelled' };
 }
 
+export async function cancelActiveGamesForUser(userId: string) {
+  // Find all active games for this user
+  const snap1 = await db.collection(GAMES)
+    .where('player1.userId', '==', userId)
+    .where('status', 'in', ['choosing', 'draw'])
+    .get();
+
+  const snap2 = await db.collection(GAMES)
+    .where('player2.userId', '==', userId)
+    .where('status', 'in', ['choosing', 'draw'])
+    .get();
+
+  const allDocs = [...snap1.docs, ...snap2.docs];
+  const cancelled: string[] = [];
+
+  for (const doc of allDocs) {
+    const game = doc.data();
+    const gameRef = db.collection(GAMES).doc(doc.id);
+
+    try {
+      await db.runTransaction(async (transaction) => {
+        const snap = await transaction.get(gameRef);
+        if (!snap.exists) return;
+        const current = snap.data()!;
+        if (current.status !== 'choosing' && current.status !== 'draw') return;
+
+        transaction.update(gameRef, {
+          status: 'cancelled',
+          cancelledBy: 'user_cleanup',
+          cancelledAt: new Date(),
+        });
+      });
+
+      await refundPlayer(game.player1.userId, game.betAmount);
+      await refundPlayer(game.player2.userId, game.betAmount);
+      cancelled.push(doc.id);
+    } catch {
+      // Game may have been resolved in the meantime
+    }
+  }
+
+  return { cancelled };
+}
+
 export function getRandomChoice(): Choice {
   const choices: Choice[] = ['pierre', 'papier', 'ciseaux'];
   return choices[Math.floor(Math.random() * 3)];

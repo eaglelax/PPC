@@ -78,6 +78,10 @@ export function cancelStaleGame(gameId: string) {
   return apiPost(`/games/${gameId}/cancel-stale`);
 }
 
+export function cancelActiveGames() {
+  return apiPost('/games/cancel-active');
+}
+
 // Orange Money
 export function payWithOrangeMoney(amount: number, phone: string, otp: string) {
   return apiPost('/orange-money/pay', { amount, phone, otp });

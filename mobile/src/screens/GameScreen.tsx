@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert, AppState } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert, AppState, Platform } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -8,7 +8,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { onGameUpdate } from '../services/gameService';
-import { submitChoice, submitTimeout, cancelStaleGame } from '../config/api';
+import { submitChoice, submitTimeout, cancelStaleGame, API_BASE } from '../config/api';
+import { auth } from '../config/firebase';
 import { COLORS, FONTS, SPACING, FONT_FAMILY, GRADIENT_COLORS, CHOICE_TIMER } from '../config/theme';
 import { RootStackParamList, Choice, Game } from '../types';
 import CircularTimer from '../components/CircularTimer';
@@ -100,12 +101,36 @@ export default function GameScreen({ navigation, route }: Props) {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'background' && game?.status === 'choosing') {
-        // Submit timeout when going to background so the other player isn't stuck
         submitTimeout(gameId).catch(() => {});
       }
     });
     return () => subscription.remove();
   }, [gameId, game?.status]);
+
+  // Web: detect page reload/close and send timeout via beacon
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const handleBeforeUnload = () => {
+      const user = auth.currentUser;
+      if (!user) return;
+      // Use sendBeacon for reliability during page unload
+      user.getIdToken().then((token) => {
+        const url = `${API_BASE}/games/${gameId}/timeout`;
+        const blob = new Blob([JSON.stringify({})], { type: 'application/json' });
+        // sendBeacon doesn't support auth headers, use fetch with keepalive instead
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({}),
+          keepalive: true,
+        }).catch(() => {});
+      }).catch(() => {});
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [gameId]);
 
   // Listen for game updates
   useEffect(() => {
