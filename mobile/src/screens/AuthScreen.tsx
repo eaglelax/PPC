@@ -11,13 +11,16 @@ import {
   ScrollView,
   Modal,
   FlatList,
+  Image,
 } from 'react-native';
-import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { createUser } from '../services/userService';
-import { COLORS, FONTS, SPACING } from '../config/theme';
+import { COLORS, FONTS, SPACING, FONT_FAMILY } from '../config/theme';
 import { ORANGE_MONEY_COUNTRIES, DEFAULT_COUNTRY, Country } from '../config/countries';
+import GradientButton from '../components/GradientButton';
+import LoadingScreen from '../components/LoadingScreen';
 
 export default function AuthScreen() {
   const [isLogin, setIsLogin] = useState(true);
@@ -75,6 +78,10 @@ export default function AuthScreen() {
     }
   };
 
+  if (loading) {
+    return <LoadingScreen message={isLogin ? 'Connexion...' : 'Creation du compte...'} />;
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -82,12 +89,16 @@ export default function AuthScreen() {
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <View style={styles.iconsRow}>
-            <MaterialCommunityIcons name="hand-back-left" size={40} color={COLORS.primary} />
-            <MaterialCommunityIcons name="hand-back-right" size={40} color={COLORS.secondary} />
-            <MaterialCommunityIcons name="content-cut" size={40} color={COLORS.gold} />
+          <Image
+            source={require('../../assets/P2C_Icon_Only.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <View style={styles.titleRow}>
+            <Text style={styles.titleP}>P</Text>
+            <Text style={styles.title2}>2</Text>
+            <Text style={styles.titleC}>C</Text>
           </View>
-          <Text style={styles.title}>PPC Game</Text>
           <Text style={styles.subtitle}>Pierre - Papier - Ciseaux</Text>
         </View>
 
@@ -140,15 +151,11 @@ export default function AuthScreen() {
             secureTextEntry
           />
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
+          <GradientButton
+            title={loading ? 'Chargement...' : isLogin ? 'Se connecter' : "S'inscrire"}
             onPress={handleSubmit}
             disabled={loading}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? 'Chargement...' : isLogin ? 'Se connecter' : "S'inscrire"}
-            </Text>
-          </TouchableOpacity>
+          />
 
           {!isLogin && (
             <Text style={styles.bonus}>Bonus : 5 000F offerts a l'inscription !</Text>
@@ -160,6 +167,8 @@ export default function AuthScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        <Text style={styles.poweredBy}>POWERED BY LEXOVA</Text>
       </ScrollView>
 
       {/* Country Picker Modal */}
@@ -221,20 +230,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.xxl,
   },
-  iconsRow: {
-    flexDirection: 'row',
-    gap: SPACING.lg,
+  logo: {
+    width: 100,
+    height: 100,
     marginBottom: SPACING.md,
   },
-  title: {
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  titleP: {
     fontSize: FONTS.title,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
+    color: COLORS.text,
+  },
+  title2: {
+    fontSize: FONTS.title,
+    fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
     color: COLORS.primary,
+  },
+  titleC: {
+    fontSize: FONTS.title,
+    fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
+    color: COLORS.text,
   },
   subtitle: {
     fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
     color: COLORS.textSecondary,
     marginTop: SPACING.xs,
+    letterSpacing: 3,
+    textTransform: 'uppercase',
   },
   form: {
     gap: SPACING.md,
@@ -244,36 +273,32 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: SPACING.md,
     fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
     color: COLORS.text,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  button: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    padding: SPACING.md,
-    alignItems: 'center',
-    marginTop: SPACING.sm,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: COLORS.text,
-    fontSize: FONTS.medium,
-    fontWeight: 'bold',
-  },
   bonus: {
     color: COLORS.gold,
     fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.medium,
     textAlign: 'center',
     fontWeight: 'bold',
   },
   switchText: {
     color: COLORS.primary,
     fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
     textAlign: 'center',
     marginTop: SPACING.sm,
+  },
+  poweredBy: {
+    color: COLORS.textSecondary,
+    fontSize: 10,
+    fontFamily: FONT_FAMILY.regular,
+    textAlign: 'center',
+    letterSpacing: 3,
+    marginTop: SPACING.xxl,
   },
   phoneRow: {
     flexDirection: 'row',
@@ -304,6 +329,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: SPACING.md,
     fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
     color: COLORS.text,
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -331,6 +357,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     color: COLORS.text,
     fontSize: FONTS.medium,
+    fontFamily: FONT_FAMILY.bold,
     fontWeight: 'bold',
   },
   countryItem: {
@@ -352,6 +379,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: COLORS.text,
     fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
   },
   countryItemDial: {
     color: COLORS.textSecondary,

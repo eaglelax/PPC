@@ -1,13 +1,16 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { onGameUpdate } from '../services/gameService';
 import { submitChoice, submitTimeout, cancelStaleGame } from '../config/api';
-import { COLORS, FONTS, SPACING, CHOICE_TIMER } from '../config/theme';
+import { COLORS, FONTS, SPACING, FONT_FAMILY, GRADIENT_COLORS, CHOICE_TIMER } from '../config/theme';
 import { RootStackParamList, Choice, Game } from '../types';
+import CircularTimer from '../components/CircularTimer';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Game'>;
@@ -31,10 +34,47 @@ export default function GameScreen({ navigation, route }: Props) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasChosenRef = useRef(false);
   const scaleAnims = useRef(CHOICES.map(() => new Animated.Value(1))).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+  const roundAnim = useRef(new Animated.Value(0)).current;
+  const vsSlideAnim = useRef(new Animated.Value(-50)).current;
+  const vsOpacityAnim = useRef(new Animated.Value(0)).current;
+  const drawSlideAnim = useRef(new Animated.Value(-100)).current;
 
   useEffect(() => {
     hasChosenRef.current = hasChosen;
   }, [hasChosen]);
+
+  // VS entry animation (on first load)
+  useEffect(() => {
+    if (game) {
+      Animated.parallel([
+        Animated.spring(vsSlideAnim, {
+          toValue: 0,
+          friction: 5,
+          tension: 60,
+          useNativeDriver: true,
+        }),
+        Animated.timing(vsOpacityAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [!!game, vsSlideAnim, vsOpacityAnim]);
+
+  // Round entry animation
+  useEffect(() => {
+    if (game?.round) {
+      roundAnim.setValue(0);
+      Animated.spring(roundAnim, {
+        toValue: 1,
+        friction: 5,
+        tension: 80,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [game?.round, roundAnim]);
 
   // Listen for game updates
   useEffect(() => {
@@ -43,11 +83,16 @@ export default function GameScreen({ navigation, route }: Props) {
 
       if (g?.status === 'draw') {
         setShowDraw(true);
-        // Don't reset hasChosen yet - wait until status goes back to 'choosing'
+        drawSlideAnim.setValue(-100);
+        Animated.spring(drawSlideAnim, {
+          toValue: 0,
+          friction: 6,
+          tension: 80,
+          useNativeDriver: true,
+        }).start();
       }
 
       if (g?.status === 'choosing' && showDraw) {
-        // Draw phase is over, allow new choices
         setShowDraw(false);
         setSelectedChoice(null);
         setHasChosen(false);
@@ -68,7 +113,7 @@ export default function GameScreen({ navigation, route }: Props) {
       }
     });
     return unsub;
-  }, [gameId, navigation, showDraw]);
+  }, [gameId, navigation, showDraw, drawSlideAnim]);
 
   // Detect stale game (choosing for > 2 minutes)
   useEffect(() => {
@@ -79,9 +124,7 @@ export default function GameScreen({ navigation, route }: Props) {
     const elapsed = Date.now() - choosingTime.getTime();
 
     if (elapsed >= 2 * 60 * 1000) {
-      cancelStaleGame(gameId).catch(() => {
-        // May already be cancelled or not stale enough
-      });
+      cancelStaleGame(gameId).catch(() => {});
     }
   }, [game?.status, game?.choosingStartedAt, gameId]);
 
@@ -91,17 +134,27 @@ export default function GameScreen({ navigation, route }: Props) {
     setHasChosen(true);
     setSelectedChoice(choice);
 
+    // Haptic feedback
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Glow animation
+    glowAnim.setValue(0);
+    Animated.timing(glowAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: false,
+    }).start();
+
     if (timerRef.current) clearInterval(timerRef.current);
 
     try {
       await submitChoice(gameId, choice);
     } catch {
-      // If API rejects (e.g. game not in choosing phase), reset state
       hasChosenRef.current = false;
       setHasChosen(false);
       setSelectedChoice(null);
     }
-  }, [firebaseUser, gameId]);
+  }, [firebaseUser, gameId, glowAnim]);
 
   // Timer countdown
   useEffect(() => {
@@ -124,6 +177,8 @@ export default function GameScreen({ navigation, route }: Props) {
     setHasChosen(true);
     if (timerRef.current) clearInterval(timerRef.current);
 
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+
     submitTimeout(gameId).catch(() => {
       hasChosenRef.current = false;
       setHasChosen(false);
@@ -131,9 +186,10 @@ export default function GameScreen({ navigation, route }: Props) {
   }, [timer, firebaseUser, gameId, game?.status]);
 
   const animatePress = (index: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Animated.sequence([
       Animated.timing(scaleAnims[index], { toValue: 0.85, duration: 100, useNativeDriver: true }),
-      Animated.timing(scaleAnims[index], { toValue: 1, duration: 100, useNativeDriver: true }),
+      Animated.spring(scaleAnims[index], { toValue: 1, friction: 3, tension: 100, useNativeDriver: true }),
     ]).start();
   };
 
@@ -142,38 +198,57 @@ export default function GameScreen({ navigation, route }: Props) {
   const isPlayer1 = game.player1.userId === firebaseUser.uid;
   const opponent = isPlayer1 ? game.player2 : game.player1;
 
-  const timerColor = timer <= 10 ? COLORS.danger : timer <= 20 ? COLORS.warning : COLORS.success;
-
   const selectedChoiceData = CHOICES.find((c) => c.key === selectedChoice);
+
+  const glowShadowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.6],
+  });
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.round}>Round {game.round || 1}</Text>
-        <Text style={styles.vs}>VS {opponent.displayName}</Text>
+        <Animated.View style={{
+          transform: [{ scale: roundAnim }],
+          opacity: roundAnim,
+        }}>
+          <Text style={styles.round}>Round {game.round || 1}</Text>
+        </Animated.View>
+        <Animated.Text style={[styles.vs, {
+          opacity: vsOpacityAnim,
+          transform: [{ translateY: vsSlideAnim }, { scale: vsOpacityAnim }],
+        }]}>VS {opponent.displayName}</Animated.Text>
         <Text style={styles.betInfo}>Mise : {game.betAmount.toLocaleString()}F</Text>
       </View>
 
       {showDraw && (
-        <View style={styles.drawBanner}>
+        <Animated.View style={[styles.drawBanner, { transform: [{ translateY: drawSlideAnim }] }]}>
           <Text style={styles.drawText}>Egalite ! On recommence...</Text>
-        </View>
+        </Animated.View>
       )}
 
       <View style={styles.timerContainer}>
-        <Text style={[styles.timerText, { color: timerColor }]}>{timer}</Text>
-        <Text style={styles.timerLabel}>secondes</Text>
+        <CircularTimer timer={timer} />
       </View>
 
       {hasChosen || game.status !== 'choosing' ? (
         <View style={styles.waitingContainer}>
           {selectedChoiceData && (
-            <MaterialCommunityIcons
-              name={selectedChoiceData.icon}
-              size={100}
-              color={COLORS.primary}
-              style={{ marginBottom: SPACING.lg }}
-            />
+            <Animated.View style={{
+              shadowColor: COLORS.primary,
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: glowShadowOpacity,
+              shadowRadius: 20,
+              elevation: 10,
+            }}>
+              <View style={styles.selectedChoiceCircle}>
+                <MaterialCommunityIcons
+                  name={selectedChoiceData.icon}
+                  size={80}
+                  color={COLORS.primary}
+                />
+              </View>
+            </Animated.View>
           )}
           {hasChosen && game.status === 'choosing' && (
             <Text style={styles.waitingText}>
@@ -191,19 +266,28 @@ export default function GameScreen({ navigation, route }: Props) {
                 style={{ transform: [{ scale: scaleAnims[index] }] }}
               >
                 <TouchableOpacity
-                  style={styles.choiceButton}
+                  activeOpacity={0.7}
                   onPress={() => {
                     animatePress(index);
                     handleChoice(c.key);
                   }}
                 >
-                  <MaterialCommunityIcons
-                    name={c.icon}
-                    size={48}
-                    color={COLORS.text}
-                    style={{ marginBottom: SPACING.sm }}
-                  />
-                  <Text style={styles.choiceLabel}>{c.label}</Text>
+                  <LinearGradient
+                    colors={[...GRADIENT_COLORS]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.choiceButtonGradient}
+                  >
+                    <View style={styles.choiceButtonInner}>
+                      <MaterialCommunityIcons
+                        name={c.icon}
+                        size={64}
+                        color={COLORS.text}
+                        style={{ marginBottom: SPACING.xs }}
+                      />
+                      <Text style={styles.choiceLabel}>{c.label}</Text>
+                    </View>
+                  </LinearGradient>
                 </TouchableOpacity>
               </Animated.View>
             ))}
@@ -229,17 +313,20 @@ const styles = StyleSheet.create({
     fontSize: FONTS.regular,
     color: COLORS.textSecondary,
     marginBottom: SPACING.xs,
+    fontFamily: FONT_FAMILY.regular,
   },
   vs: {
     fontSize: FONTS.xlarge,
     fontWeight: 'bold',
     color: COLORS.secondary,
     marginBottom: SPACING.xs,
+    fontFamily: FONT_FAMILY.bold,
   },
   betInfo: {
     fontSize: FONTS.regular,
     color: COLORS.gold,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
   },
   drawBanner: {
     backgroundColor: COLORS.warning + '20',
@@ -254,18 +341,11 @@ const styles = StyleSheet.create({
     color: COLORS.warning,
     fontSize: FONTS.medium,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
   },
   timerContainer: {
     alignItems: 'center',
-    marginBottom: SPACING.xl,
-  },
-  timerText: {
-    fontSize: 72,
-    fontWeight: 'bold',
-  },
-  timerLabel: {
-    fontSize: FONTS.regular,
-    color: COLORS.textSecondary,
+    marginBottom: SPACING.lg,
   },
   choicesContainer: {
     flex: 1,
@@ -277,24 +357,39 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: SPACING.xl,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
   },
   choicesRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
   },
-  choiceButton: {
+  choiceButtonGradient: {
+    borderRadius: 22,
+    padding: 2,
+  },
+  choiceButtonInner: {
     backgroundColor: COLORS.surface,
     borderRadius: 20,
     padding: SPACING.lg,
     alignItems: 'center',
-    width: 100,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
+    width: 106,
   },
   choiceLabel: {
     color: COLORS.text,
     fontSize: 14,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.semibold,
+  },
+  selectedChoiceCircle: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.lg,
   },
   waitingContainer: {
     flex: 1,
@@ -304,5 +399,6 @@ const styles = StyleSheet.create({
   waitingText: {
     fontSize: FONTS.medium,
     color: COLORS.textSecondary,
+    fontFamily: FONT_FAMILY.regular,
   },
 });

@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "ppc-game",
+    "name": "P2C",
     "slug": "ppc-game",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "icon": "./assets/P2C_Icon_App.png",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "image": "./assets/P2C_Splash_Screen.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#111118"
     },
     "ios": {
       "supportsTablet": true,
@@ -19,14 +19,14 @@
     "android": {
       "package": "com.ppcgame.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/P2C_Icon_Only.png",
+        "backgroundColor": "#111118"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/P2C_Icon_App.png"
     },
     "extra": {
       "eas": {
@@ -34,6 +34,8 @@
       }
     },
     "owner": "axelnig",
-    "plugins": []
+    "plugins": [
+      "expo-font"
+    ]
   }
 }

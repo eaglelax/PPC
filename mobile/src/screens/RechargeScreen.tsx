@@ -16,10 +16,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
 import { payWithOrangeMoney } from '../config/api';
-import { COLORS, FONTS, SPACING, MIN_RECHARGE } from '../config/theme';
+import { COLORS, FONTS, SPACING, FONT_FAMILY, MIN_RECHARGE } from '../config/theme';
 import { RootStackParamList } from '../types';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
 import { ORANGE_MONEY_COUNTRIES, DEFAULT_COUNTRY, Country } from '../config/countries';
+import GradientButton from '../components/GradientButton';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Recharge'>;
@@ -158,13 +159,11 @@ export default function RechargeScreen({ navigation }: Props) {
               </View>
             </View>
 
-            <TouchableOpacity
-              style={[styles.button, !numAmount && styles.buttonDisabled]}
+            <GradientButton
+              title="Continuer"
               onPress={handleContinue}
               disabled={!numAmount}
-            >
-              <Text style={styles.buttonText}>Continuer</Text>
-            </TouchableOpacity>
+            />
           </>
         )}
 
@@ -303,6 +302,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginTop: SPACING.xl,
     marginBottom: SPACING.lg,
+    fontFamily: FONT_FAMILY.bold,
   },
   currentBalance: {
     backgroundColor: COLORS.surface,
@@ -316,16 +316,19 @@ const styles = StyleSheet.create({
   balanceLabel: {
     color: COLORS.textSecondary,
     fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
   },
   balanceValue: {
     color: COLORS.gold,
     fontSize: FONTS.large,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
   },
   label: {
     color: COLORS.textSecondary,
     fontSize: FONTS.regular,
     marginBottom: SPACING.sm,
+    fontFamily: FONT_FAMILY.regular,
   },
   input: {
     backgroundColor: COLORS.surface,
@@ -337,6 +340,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     textAlign: 'center',
     marginBottom: SPACING.md,
+    fontFamily: FONT_FAMILY.bold,
   },
   quickRow: {
     flexDirection: 'row',
@@ -359,10 +363,12 @@ const styles = StyleSheet.create({
   quickText: {
     color: COLORS.textSecondary,
     fontSize: 14,
+    fontFamily: FONT_FAMILY.regular,
   },
   quickTextActive: {
     color: COLORS.primary,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.semibold,
   },
   summary: {
     backgroundColor: COLORS.surface,
@@ -384,22 +390,21 @@ const styles = StyleSheet.create({
   summaryLabel: {
     color: COLORS.textSecondary,
     fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
   },
   summaryValue: {
     color: COLORS.text,
     fontSize: FONTS.regular,
-  },
-  button: {
-    backgroundColor: COLORS.success,
-    borderRadius: 12,
-    padding: SPACING.md,
-    alignItems: 'center',
+    fontFamily: FONT_FAMILY.regular,
   },
   omButton: {
     flexDirection: 'row',
     gap: SPACING.sm,
     justifyContent: 'center',
-    backgroundColor: '#FF6600',
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    padding: SPACING.md,
+    alignItems: 'center',
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -408,6 +413,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: FONTS.medium,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
   },
   amountBadge: {
     backgroundColor: COLORS.surface,
@@ -424,6 +430,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: FONTS.medium,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
   },
   changeLink: {
     color: COLORS.primary,
@@ -441,8 +448,9 @@ const styles = StyleSheet.create({
   },
   otpHintText: {
     color: COLORS.gold,
-    fontSize: FONTS.small,
+    fontSize: 13,
     flex: 1,
+    fontFamily: FONT_FAMILY.regular,
   },
   processingContainer: {
     alignItems: 'center',
@@ -453,11 +461,13 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: FONTS.medium,
     textAlign: 'center',
+    fontFamily: FONT_FAMILY.bold,
   },
   processingSubtext: {
     color: COLORS.textSecondary,
     fontSize: FONTS.regular,
     textAlign: 'center',
+    fontFamily: FONT_FAMILY.regular,
   },
   phoneRow: {
     flexDirection: 'row',
@@ -517,6 +527,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: FONTS.medium,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
   },
   countryItem: {
     flexDirection: 'row',

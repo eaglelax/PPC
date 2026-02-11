@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
 import { withdrawFunds, getWithdrawalFee } from '../services/betService';
-import { COLORS, FONTS, SPACING } from '../config/theme';
+import { COLORS, FONTS, SPACING, FONT_FAMILY } from '../config/theme';
 import { RootStackParamList } from '../types';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
 import { ORANGE_MONEY_COUNTRIES, DEFAULT_COUNTRY, Country } from '../config/countries';
@@ -260,6 +260,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginTop: SPACING.xl,
     marginBottom: SPACING.lg,
+    fontFamily: FONT_FAMILY.bold,
   },
   currentBalance: {
     backgroundColor: COLORS.surface,
@@ -273,16 +274,19 @@ const styles = StyleSheet.create({
   balanceLabel: {
     color: COLORS.textSecondary,
     fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
   },
   balanceValue: {
     color: COLORS.gold,
     fontSize: FONTS.large,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
   },
   label: {
     color: COLORS.textSecondary,
     fontSize: FONTS.regular,
     marginBottom: SPACING.sm,
+    fontFamily: FONT_FAMILY.regular,
   },
   input: {
     backgroundColor: COLORS.surface,
@@ -294,12 +298,14 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     textAlign: 'center',
     marginBottom: SPACING.xs,
+    fontFamily: FONT_FAMILY.bold,
   },
   minText: {
     color: COLORS.textSecondary,
     fontSize: 12,
     textAlign: 'center',
     marginBottom: SPACING.md,
+    fontFamily: FONT_FAMILY.regular,
   },
   phoneRow: {
     flexDirection: 'row',
@@ -355,13 +361,15 @@ const styles = StyleSheet.create({
   summaryLabel: {
     color: COLORS.textSecondary,
     fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
   },
   summaryValue: {
     color: COLORS.text,
     fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
   },
   button: {
-    backgroundColor: '#FF6600',
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
     padding: SPACING.md,
     alignItems: 'center',
@@ -376,6 +384,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: FONTS.medium,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
   },
   // Modal styles
   modalOverlay: {
@@ -402,6 +411,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: FONTS.medium,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
   },
   countryItem: {
     flexDirection: 'row',

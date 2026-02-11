@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert, AppState } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert, AppState, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { onBetUpdate, cancelBet } from '../services/betService';
-import { COLORS, FONTS, SPACING } from '../config/theme';
+import { COLORS, FONTS, SPACING, FONT_FAMILY } from '../config/theme';
 import { RootStackParamList } from '../types';
 
 type Props = {
@@ -13,34 +13,93 @@ type Props = {
   route: RouteProp<RootStackParamList, 'Waiting'>;
 };
 
+// Animated dots component
+function AnimatedDots() {
+  const dot1 = useRef(new Animated.Value(0.3)).current;
+  const dot2 = useRef(new Animated.Value(0.3)).current;
+  const dot3 = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animate = (dot: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(dot, { toValue: 1, duration: 400, delay, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+        ])
+      );
+
+    const a1 = animate(dot1, 0);
+    const a2 = animate(dot2, 200);
+    const a3 = animate(dot3, 400);
+    a1.start();
+    a2.start();
+    a3.start();
+
+    return () => {
+      a1.stop();
+      a2.stop();
+      a3.stop();
+    };
+  }, [dot1, dot2, dot3]);
+
+  return (
+    <View style={dotsStyles.container}>
+      {[dot1, dot2, dot3].map((dot, i) => (
+        <Animated.View
+          key={i}
+          style={[dotsStyles.dot, { opacity: dot }]}
+        />
+      ))}
+    </View>
+  );
+}
+
+const dotsStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: SPACING.sm,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.primary,
+  },
+});
+
 export default function WaitingScreen({ navigation, route }: Props) {
   const { betId, betAmount } = route.params;
   const { firebaseUser } = useAuth();
-  const [dots, setDots] = useState('');
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0.2)).current;
   const [cancelling, setCancelling] = useState(false);
   const matchedRef = useRef(false);
   const cancellingRef = useRef(false);
 
-  // Pulse animation
+  // Pulse animation for the shield logo
   useEffect(() => {
     const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.2, duration: 800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.15, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
       ])
     );
     pulse.start();
     return () => pulse.stop();
   }, [pulseAnim]);
 
-  // Animated dots
+  // Glow animation
   useEffect(() => {
-    const interval = setInterval(() => {
-      setDots((prev) => (prev.length >= 3 ? '' : prev + '.'));
-    }, 500);
-    return () => clearInterval(interval);
-  }, []);
+    const glow = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 0.6, duration: 1200, useNativeDriver: false }),
+        Animated.timing(glowAnim, { toValue: 0.2, duration: 1200, useNativeDriver: false }),
+      ])
+    );
+    glow.start();
+    return () => glow.stop();
+  }, [glowAnim]);
 
   // Listen for bet match via Firestore
   useEffect(() => {
@@ -86,12 +145,28 @@ export default function WaitingScreen({ navigation, route }: Props) {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.iconContainer, { transform: [{ scale: pulseAnim }] }]}>
-        <Ionicons name="search" size={80} color={COLORS.primary} />
+      <Animated.View style={[styles.iconContainer, {
+        transform: [{ scale: pulseAnim }],
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: glowAnim,
+        shadowRadius: 30,
+      }]}>
+        <Image
+          source={require('../../assets/P2C_Icon_Only.png')}
+          style={styles.shieldLogo}
+          resizeMode="contain"
+        />
       </Animated.View>
 
-      <Text style={styles.title}>Recherche d'un adversaire{dots}</Text>
-      <Text style={styles.betInfo}>Mise : {betAmount.toLocaleString()}F</Text>
+      <Text style={styles.title}>Recherche d'un adversaire</Text>
+      <AnimatedDots />
+
+      <View style={styles.betCard}>
+        <Ionicons name="cash-outline" size={20} color={COLORS.gold} />
+        <Text style={styles.betInfo}>{betAmount.toLocaleString()}F</Text>
+      </View>
+
       <Text style={styles.subtitle}>
         Un joueur peut rejoindre votre pari a tout moment
       </Text>
@@ -120,23 +195,41 @@ const styles = StyleSheet.create({
   iconContainer: {
     marginBottom: SPACING.xl,
   },
+  shieldLogo: {
+    width: 100,
+    height: 100,
+  },
   title: {
     fontSize: FONTS.large,
     fontWeight: 'bold',
     color: COLORS.text,
-    marginBottom: SPACING.md,
+    fontFamily: FONT_FAMILY.bold,
+  },
+  betCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    marginTop: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.gold + '40',
   },
   betInfo: {
-    fontSize: FONTS.medium,
+    fontSize: FONTS.large,
     color: COLORS.gold,
     fontWeight: 'bold',
-    marginBottom: SPACING.sm,
+    fontFamily: FONT_FAMILY.bold,
   },
   subtitle: {
     fontSize: FONTS.regular,
     color: COLORS.textSecondary,
     textAlign: 'center',
+    marginTop: SPACING.lg,
     marginBottom: SPACING.xxl,
+    fontFamily: FONT_FAMILY.regular,
   },
   cancelButton: {
     backgroundColor: COLORS.surface,
@@ -153,5 +246,6 @@ const styles = StyleSheet.create({
     color: COLORS.danger,
     fontSize: FONTS.regular,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.semibold,
   },
 });

@@ -13,10 +13,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
-import { COLORS, FONTS, SPACING, MIN_BET_AMOUNT, GAME_FEE } from '../config/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { COLORS, FONTS, SPACING, FONT_FAMILY, GRADIENT_COLORS, MIN_BET_AMOUNT, GAME_FEE } from '../config/theme';
 import { RootStackParamList, Bet } from '../types';
 import { onAvailableBets, createBet, joinBet } from '../services/betService';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
+import GradientButton from '../components/GradientButton';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Bet'>;
@@ -174,8 +176,16 @@ export default function BetScreen({ navigation }: Props) {
       <TouchableOpacity
         style={styles.fab}
         onPress={() => setModalVisible(true)}
+        activeOpacity={0.8}
       >
-        <Ionicons name="add" size={32} color={COLORS.text} />
+        <LinearGradient
+          colors={[...GRADIENT_COLORS]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.fabGradient}
+        >
+          <Ionicons name="add" size={32} color={COLORS.text} />
+        </LinearGradient>
       </TouchableOpacity>
 
       <Navbar active="Bet" />
@@ -226,15 +236,13 @@ export default function BetScreen({ navigation }: Props) {
                 <Text style={styles.modalCancelText}>Annuler</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.modalConfirm, loading && styles.modalConfirmDisabled]}
-                onPress={handleCreateBet}
-                disabled={loading}
-              >
-                <Text style={styles.modalConfirmText}>
-                  {loading ? 'Creation...' : 'Creer le pari'}
-                </Text>
-              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <GradientButton
+                  title={loading ? 'Creation...' : 'Creer le pari'}
+                  onPress={handleCreateBet}
+                  disabled={loading}
+                />
+              </View>
             </View>
           </View>
         </View>
@@ -256,6 +264,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: SPACING.xl,
     marginBottom: SPACING.md,
+    fontFamily: FONT_FAMILY.bold,
   },
   balanceRow: {
     flexDirection: 'row',
@@ -267,11 +276,13 @@ const styles = StyleSheet.create({
   balanceLabel: {
     color: COLORS.textSecondary,
     fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
   },
   balanceValue: {
     color: COLORS.gold,
     fontSize: FONTS.large,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
   },
   list: {
     paddingBottom: NAVBAR_HEIGHT + 80,
@@ -297,16 +308,19 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: FONTS.regular,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.semibold,
   },
   betTime: {
     color: COLORS.textSecondary,
     fontSize: 12,
     marginTop: 2,
+    fontFamily: FONT_FAMILY.regular,
   },
   betAmount: {
     color: COLORS.gold,
     fontSize: FONTS.large,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
   },
   betFee: {
     color: COLORS.textSecondary,
@@ -325,6 +339,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontWeight: 'bold',
     fontSize: 14,
+    fontFamily: FONT_FAMILY.semibold,
   },
   ownBadge: {
     backgroundColor: COLORS.surfaceLight,
@@ -338,6 +353,7 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: 'bold',
     fontSize: 12,
+    fontFamily: FONT_FAMILY.semibold,
   },
   emptyContainer: {
     flex: 1,
@@ -349,10 +365,12 @@ const styles = StyleSheet.create({
     fontSize: FONTS.medium,
     marginBottom: SPACING.xs,
     marginTop: SPACING.md,
+    fontFamily: FONT_FAMILY.bold,
   },
   emptySubtext: {
     color: COLORS.textSecondary,
     fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
   },
   fab: {
     position: 'absolute',
@@ -361,14 +379,18 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: COLORS.primary,
+    elevation: 5,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+  },
+  fabGradient: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
   },
   modalOverlay: {
     flex: 1,
@@ -387,11 +409,13 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: SPACING.lg,
     textAlign: 'center',
+    fontFamily: FONT_FAMILY.bold,
   },
   modalLabel: {
     color: COLORS.textSecondary,
     fontSize: FONTS.regular,
     marginBottom: SPACING.sm,
+    fontFamily: FONT_FAMILY.regular,
   },
   modalInput: {
     backgroundColor: COLORS.background,
@@ -403,6 +427,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     textAlign: 'center',
     marginBottom: SPACING.md,
+    fontFamily: FONT_FAMILY.bold,
   },
   modalFeeInfo: {
     backgroundColor: COLORS.background,
@@ -421,6 +446,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
   },
   modalButtons: {
     flexDirection: 'row',

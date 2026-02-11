@@ -1,10 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../config/firebase';
-import { COLORS, FONTS, SPACING } from '../config/theme';
+import { COLORS, FONTS, SPACING, FONT_FAMILY } from '../config/theme';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
 
 export default function HomeScreen() {
@@ -31,6 +31,11 @@ export default function HomeScreen() {
             <Text style={styles.welcomeName}>{userData.displayName} !</Text>
           </View>
         </View>
+        <Image
+          source={require('../../assets/P2C_Icon_Only.png')}
+          style={styles.headerLogo}
+          resizeMode="contain"
+        />
         <TouchableOpacity onPress={() => signOut(auth)} style={styles.logoutButton}>
           <Ionicons name="log-out-outline" size={24} color={COLORS.danger} />
         </TouchableOpacity>
@@ -107,6 +112,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: FONTS.large,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
   },
   nameContainer: {
     flex: 1,
@@ -114,11 +120,18 @@ const styles = StyleSheet.create({
   welcomeLabel: {
     fontSize: FONTS.regular,
     color: COLORS.textSecondary,
+    fontFamily: FONT_FAMILY.regular,
   },
   welcomeName: {
     fontSize: FONTS.large,
     fontWeight: 'bold',
     color: COLORS.text,
+    fontFamily: FONT_FAMILY.bold,
+  },
+  headerLogo: {
+    width: 36,
+    height: 36,
+    marginRight: SPACING.sm,
   },
   logoutButton: {
     padding: SPACING.sm,
@@ -136,11 +149,13 @@ const styles = StyleSheet.create({
     fontSize: FONTS.regular,
     color: COLORS.textSecondary,
     marginBottom: SPACING.sm,
+    fontFamily: FONT_FAMILY.regular,
   },
   balanceAmount: {
     fontSize: FONTS.title,
     fontWeight: 'bold',
     color: COLORS.gold,
+    fontFamily: FONT_FAMILY.bold,
   },
   pixContainer: {
     flexDirection: 'row',
@@ -178,10 +193,12 @@ const styles = StyleSheet.create({
     fontSize: FONTS.large,
     fontWeight: 'bold',
     color: COLORS.text,
+    fontFamily: FONT_FAMILY.bold,
   },
   statLabel: {
     fontSize: 12,
     color: COLORS.textSecondary,
     marginTop: 4,
+    fontFamily: FONT_FAMILY.regular,
   },
 });

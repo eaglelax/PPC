@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { COLORS, SPACING } from '../config/theme';
+import { COLORS, SPACING, FONT_FAMILY } from '../config/theme';
 import { RootStackParamList } from '../types';
 
 type NavScreen = 'Home' | 'Bet' | 'Recharge' | 'Withdraw';
@@ -44,6 +44,7 @@ export default function Navbar({ active }: Props) {
             <Text style={[styles.label, isActive && styles.labelActive]}>
               {tab.label}
             </Text>
+            {isActive && <View style={styles.activeDot} />}
           </TouchableOpacity>
         );
       })}
@@ -75,10 +76,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textSecondary,
     marginTop: 2,
+    fontFamily: FONT_FAMILY.regular,
   },
   labelActive: {
     color: COLORS.primary,
     fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.semibold,
+  },
+  activeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.primary,
+    marginTop: 2,
   },
 });
 

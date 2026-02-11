@@ -2,6 +2,8 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts, Sora_600SemiBold, Sora_700Bold } from '@expo-google-fonts/sora';
+import { Outfit_400Regular, Outfit_500Medium } from '@expo-google-fonts/outfit';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import LoadingScreen from './src/components/LoadingScreen';
 import AuthScreen from './src/screens/AuthScreen';
@@ -62,6 +64,17 @@ function AppNavigator() {
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    Sora_600SemiBold,
+    Sora_700Bold,
+    Outfit_400Regular,
+    Outfit_500Medium,
+  });
+
+  if (!fontsLoaded) {
+    return <LoadingScreen />;
+  }
+
   return (
     <AuthProvider>
       <NavigationContainer>

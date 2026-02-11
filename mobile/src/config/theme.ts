@@ -1,18 +1,39 @@
 export const COLORS = {
-  primary: '#6C63FF',
-  primaryDark: '#5A52D5',
-  secondary: '#FF6584',
-  success: '#00C853',
-  danger: '#FF5252',
-  warning: '#FFB300',
-  background: '#0F0E17',
-  surface: '#1A1A2E',
+  // Couleurs principales (charte P2C)
+  primary: '#FF6B35',       // Orange Soleil - CTA, boutons
+  primaryDark: '#E63946',   // Rouge Terre - pressed states
+  secondary: '#E63946',     // Rouge Terre - VS, highlights
+  success: '#00D4AA',       // Menthe Victoire - victoires, gains
+  danger: '#E63946',        // Rouge Terre - defaites, erreurs
+  warning: '#FFB627',       // Or Sahel - timer warning
+
+  // Neutres (charte P2C)
+  background: '#111118',    // Noir Profond
+  surface: '#1A1A2E',       // Bleu Nuit
   surfaceLight: '#232340',
   text: '#FFFFFE',
-  textSecondary: '#A7A9BE',
+  textSecondary: '#8E8EA0', // Gris charte
   border: '#2E2E4A',
-  gold: '#FFD700',
-  pix: '#00D9FF',
+
+  // Accents
+  gold: '#FFB627',          // Or Sahel - solde, montants
+  pix: '#6C3CE1',           // Violet Energie - Pix, badges gaming
+  accent: '#6C3CE1',        // Violet Energie
+  mint: '#00D4AA',          // Menthe Victoire
+
+  // Degrade signature
+  gradientStart: '#FFB627',
+  gradientMid: '#FF6B35',
+  gradientEnd: '#E63946',
+};
+
+export const GRADIENT_COLORS = ['#FFB627', '#FF6B35', '#E63946'] as const;
+
+export const FONT_FAMILY = {
+  bold: 'Sora_700Bold',
+  semibold: 'Sora_600SemiBold',
+  regular: 'Outfit_400Regular',
+  medium: 'Outfit_500Medium',
 };
 
 export const FONTS = {
