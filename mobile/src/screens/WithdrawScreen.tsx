@@ -67,13 +67,13 @@ export default function WithdrawScreen({ navigation }: Props) {
     }
 
     if (Platform.OS === 'web') {
-      if (window.confirm(`Confirmer le retrait de ${numAmount.toLocaleString()}F via Orange Money ?\nVous recevrez ${netAmount.toLocaleString()}F (frais ${fee.toLocaleString()}F)`)) {
+      if (window.confirm(`Confirmer le retrait de ${numAmount.toLocaleString()}F ?\nVous recevrez ${netAmount.toLocaleString()}F (frais ${fee.toLocaleString()}F)`)) {
         processWithdraw();
       }
     } else {
       Alert.alert(
         'Confirmer le retrait',
-        `Retirer ${numAmount.toLocaleString()}F via Orange Money ?\nVous recevrez ${netAmount.toLocaleString()}F (frais ${fee.toLocaleString()}F)`,
+        `Retirer ${numAmount.toLocaleString()}F ?\nVous recevrez ${netAmount.toLocaleString()}F (frais ${fee.toLocaleString()}F)`,
         [
           { text: 'Annuler', style: 'cancel' },
           { text: 'Confirmer', onPress: () => processWithdraw() },
@@ -144,7 +144,7 @@ export default function WithdrawScreen({ navigation }: Props) {
       />
       <Text style={styles.minText}>Minimum : 1 000F</Text>
 
-      <Text style={styles.label}>Numero Orange Money</Text>
+      <Text style={styles.label}>Numero de telephone</Text>
       <View style={styles.phoneRow}>
         <TouchableOpacity
           style={styles.countrySelector}
@@ -191,9 +191,9 @@ export default function WithdrawScreen({ navigation }: Props) {
         onPress={handleWithdraw}
         disabled={loading || !numAmount || !phone}
       >
-        <Ionicons name="phone-portrait-outline" size={20} color={COLORS.text} />
+        <Ionicons name="cash-outline" size={20} color={COLORS.text} />
         <Text style={styles.buttonText}>
-          {loading ? 'Traitement...' : 'Retirer via Orange Money'}
+          {loading ? 'Traitement...' : 'Retirer'}
         </Text>
       </TouchableOpacity>
     </ScrollView>
