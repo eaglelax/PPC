@@ -151,7 +151,7 @@ router.post('/initiate', verifyToken, async (req: AuthRequest, res) => {
 
 router.get('/status/:reference', verifyToken, async (req: AuthRequest, res) => {
   try {
-    const { reference } = req.params;
+    const reference = req.params.reference as string;
     const record = payments.get(reference);
 
     if (!record) {
@@ -173,7 +173,7 @@ router.get('/status/:reference', verifyToken, async (req: AuthRequest, res) => {
         const config = getGeniusPayConfig();
         const payment = await getPaymentStatus(config, reference);
 
-        if (payment.status === 'completed' && record.status !== 'completed') {
+        if (payment.status === 'completed') {
           record.status = 'completed';
           const result = await rechargeUserBalance(record.userId, record.amount);
           updateFirestore(reference, { status: 'completed', completedAt: new Date() });
@@ -205,7 +205,7 @@ router.get('/status/:reference', verifyToken, async (req: AuthRequest, res) => {
 
 router.post('/demo-complete/:reference', verifyToken, async (req: AuthRequest, res) => {
   try {
-    const { reference } = req.params;
+    const reference = req.params.reference as string;
     const record = payments.get(reference);
 
     if (!record) {
