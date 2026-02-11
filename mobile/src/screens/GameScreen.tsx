@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, AppState, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, AppState, Platform, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -14,6 +14,16 @@ import { COLORS, FONTS, SPACING, FONT_FAMILY, GRADIENT_COLORS, CHOICE_TIMER } fr
 import { RootStackParamList, Choice, Game } from '../types';
 import { showAlert } from '../utils/alert';
 import CircularTimer from '../components/CircularTimer';
+
+function safeHaptic(type: 'impact' | 'notification', style?: any) {
+  try {
+    if (type === 'impact') {
+      Haptics.impactAsync(style || Haptics.ImpactFeedbackStyle.Medium);
+    } else {
+      Haptics.notificationAsync(style || Haptics.NotificationFeedbackType.Warning);
+    }
+  } catch {}
+}
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Game'>;
@@ -39,6 +49,7 @@ export default function GameScreen({ navigation, route }: Props) {
   const hasChosenRef = useRef(false);
   const timeoutFailCountRef = useRef(0);
   const isOfflineRef = useRef(false);
+  const showDrawRef = useRef(false);
   const scaleAnims = useRef(CHOICES.map(() => new Animated.Value(1))).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
   const roundAnim = useRef(new Animated.Value(0)).current;
@@ -49,6 +60,10 @@ export default function GameScreen({ navigation, route }: Props) {
   useEffect(() => {
     hasChosenRef.current = hasChosen;
   }, [hasChosen]);
+
+  useEffect(() => {
+    showDrawRef.current = showDraw;
+  }, [showDraw]);
 
   // VS entry animation (on first load)
   useEffect(() => {
@@ -152,6 +167,7 @@ export default function GameScreen({ navigation, route }: Props) {
 
       if (g?.status === 'draw') {
         setShowDraw(true);
+        showDrawRef.current = true;
         drawSlideAnim.setValue(-100);
         Animated.spring(drawSlideAnim, {
           toValue: 0,
@@ -161,8 +177,9 @@ export default function GameScreen({ navigation, route }: Props) {
         }).start();
       }
 
-      if (g?.status === 'choosing' && showDraw) {
+      if (g?.status === 'choosing' && showDrawRef.current) {
         setShowDraw(false);
+        showDrawRef.current = false;
         setSelectedChoice(null);
         setHasChosen(false);
         hasChosenRef.current = false;
@@ -193,7 +210,7 @@ export default function GameScreen({ navigation, route }: Props) {
       );
     });
     return unsub;
-  }, [gameId, navigation, showDraw, drawSlideAnim]);
+  }, [gameId, navigation, drawSlideAnim]);
 
   // Detect stale game (choosing for > 2 minutes)
   useEffect(() => {
@@ -214,8 +231,7 @@ export default function GameScreen({ navigation, route }: Props) {
     setHasChosen(true);
     setSelectedChoice(choice);
 
-    // Haptic feedback
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    safeHaptic('impact', Haptics.ImpactFeedbackStyle.Medium);
 
     // Glow animation
     glowAnim.setValue(0);
@@ -266,7 +282,7 @@ export default function GameScreen({ navigation, route }: Props) {
     setHasChosen(true);
     if (timerRef.current) clearInterval(timerRef.current);
 
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    safeHaptic('notification', Haptics.NotificationFeedbackType.Warning);
 
     submitTimeout(gameId).catch(() => {
       timeoutFailCountRef.current += 1;
@@ -279,14 +295,21 @@ export default function GameScreen({ navigation, route }: Props) {
   }, [timer, firebaseUser, gameId, game?.status]);
 
   const animatePress = (index: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    safeHaptic('impact', Haptics.ImpactFeedbackStyle.Light);
     Animated.sequence([
       Animated.timing(scaleAnims[index], { toValue: 0.85, duration: 100, useNativeDriver: true }),
       Animated.spring(scaleAnims[index], { toValue: 1, friction: 3, tension: 100, useNativeDriver: true }),
     ]).start();
   };
 
-  if (!game || !firebaseUser) return null;
+  if (!game || !firebaseUser) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Chargement de la partie...</Text>
+      </View>
+    );
+  }
 
   const isPlayer1 = game.player1.userId === firebaseUser.uid;
   const opponent = isPlayer1 ? game.player2 : game.player1;
@@ -399,6 +422,18 @@ export default function GameScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.md,
+  },
+  loadingText: {
+    color: COLORS.textSecondary,
+    fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
