@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFonts, Sora_600SemiBold, Sora_700Bold } from '@expo-google-fonts/sora';
 import { Outfit_400Regular, Outfit_500Medium } from '@expo-google-fonts/outfit';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+import ErrorBoundary from './src/components/ErrorBoundary';
 import LoadingScreen from './src/components/LoadingScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import HomeScreen from './src/screens/HomeScreen';
@@ -76,11 +77,13 @@ export default function App() {
   }
 
   return (
-    <AuthProvider>
-      <NavigationContainer>
-        <StatusBar style="light" />
-        <AppNavigator />
-      </NavigationContainer>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <NavigationContainer>
+          <StatusBar style="light" />
+          <AppNavigator />
+        </NavigationContainer>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
