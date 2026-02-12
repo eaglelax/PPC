@@ -72,7 +72,7 @@ export default function WaitingScreen({ navigation, route }: Props) {
   const { betId, betAmount } = route.params;
   const { firebaseUser } = useAuth();
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const glowAnim = useRef(new Animated.Value(0.2)).current;
+
   const [cancelling, setCancelling] = useState(false);
   const matchedRef = useRef(false);
   const cancellingRef = useRef(false);
@@ -88,18 +88,6 @@ export default function WaitingScreen({ navigation, route }: Props) {
     pulse.start();
     return () => pulse.stop();
   }, [pulseAnim]);
-
-  // Glow animation
-  useEffect(() => {
-    const glow = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, { toValue: 0.6, duration: 1200, useNativeDriver: false }),
-        Animated.timing(glowAnim, { toValue: 0.2, duration: 1200, useNativeDriver: false }),
-      ])
-    );
-    glow.start();
-    return () => glow.stop();
-  }, [glowAnim]);
 
   // Listen for bet match via Firestore
   useEffect(() => {
@@ -154,7 +142,7 @@ export default function WaitingScreen({ navigation, route }: Props) {
         transform: [{ scale: pulseAnim }],
         shadowColor: COLORS.primary,
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: glowAnim,
+        shadowOpacity: 0.4,
         shadowRadius: 30,
       }]}>
         <Image

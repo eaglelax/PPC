@@ -28,14 +28,14 @@
     "web": {
       "favicon": "./assets/P2C_Icon_App.png"
     },
-    "extra": {
-      "eas": {
-        "projectId": "059f80db-2ae7-4aed-b05b-d177076b279f"
-      }
-    },
-    "owner": "axelnig",
+    "owner": "lexova",
     "plugins": [
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a9c47ee1-03c5-4926-87da-049f5050f8b8"
+      }
+    }
   }
 }
