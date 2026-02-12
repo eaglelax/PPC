@@ -50,3 +50,15 @@ Thumbs.db
 
 # Misc
 image.png
+image copy*.png
+
+# Sensitive files
+api/auth_resp.json
+api/token.txt
+api/token_new.txt
+auth_users.json
+mobile/credentials.json
+ppc-game-8b35f-firebase-adminsdk-*.json
+
+# Build artifacts
+ppcgame.app/

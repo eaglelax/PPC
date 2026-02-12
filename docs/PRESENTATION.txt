@@ -1,0 +1,225 @@
+================================================================================
+                         P2C - PIERRE PAPIER CISEAUX
+================================================================================
+
+PRESENTATION
+------------
+P2C (prononce "Pi-deux-ci") est une application mobile de jeu Pierre-Papier-
+Ciseaux avec systeme de paris en argent reel. Les joueurs peuvent miser de
+l'argent, affronter d'autres joueurs en temps reel et gagner le double de
+leur mise.
+
+
+================================================================================
+                                  CONCEPT
+================================================================================
+
+Le jeu classique Pierre-Papier-Ciseaux, mais avec de vrais enjeux :
+  - Misez de l'argent contre un adversaire
+  - Jouez en temps reel
+  - Le gagnant remporte la mise des deux joueurs
+  - Gagnez des Pix a chaque victoire
+
+
+================================================================================
+                              REGLES DU JEU
+================================================================================
+
+VICTOIRE
+--------
+  Pierre  > Ciseaux  (La pierre ecrase les ciseaux)
+  Ciseaux > Papier   (Les ciseaux coupent le papier)
+  Papier  > Pierre   (Le papier enveloppe la pierre)
+
+EGALITE
+-------
+Si les deux joueurs font le meme choix, la partie recommence automatiquement
+jusqu'a ce qu'il y ait un gagnant.
+
+TIMER
+-----
+Chaque joueur a 30 secondes pour faire son choix. Passe ce delai, un choix
+aleatoire est fait automatiquement.
+
+
+================================================================================
+                             FONCTIONNALITES
+================================================================================
+
+1. AUTHENTIFICATION
+   - Inscription avec email et mot de passe
+   - Connexion securisee
+   - Solde initial de 5 000F offert a l'inscription
+
+2. PORTEFEUILLE
+   - Consulter son solde en temps reel
+   - Historique des transactions
+   - Statistiques de jeu (parties, victoires, defaites, win rate)
+
+3. RECHARGE
+   - Recharge via Orange Money
+   - Support prevu : MTN Money, Moov Money
+   - 0F de frais sur les recharges
+   - Processus : Montant > Numero > Code OTP > Confirmation
+
+4. PARIS
+   - Creer un pari avec le montant de son choix (minimum 1 000F + 10F frais)
+   - Voir la liste des paris disponibles (classes par montant)
+   - Rejoindre un pari existant (mise + 10F frais)
+   - Annuler son pari (remboursement complet)
+
+5. JEU
+   - Interface simple avec 3 boutons : Pierre, Papier, Ciseaux
+   - Timer de 30 secondes
+   - Affichage en temps reel du statut de l'adversaire
+   - Rounds multiples en cas d'egalite
+
+6. RESULTATS
+   - Animation de revelation des choix
+   - Affichage du gagnant
+   - Mise a jour instantanee du solde
+   - Gain de +1 Pix par victoire
+
+7. RETRAIT
+   - Retrait vers Orange Money / MTN / Moov
+   - Frais de retrait : 2% (frais Orange Money)
+   - Affichage du montant net avant confirmation
+   - Exemple : Retrait 10 000F → recoit 9 800F
+
+
+================================================================================
+                    SYSTEME DE RECOMPENSES : LES PIX
+================================================================================
+
+QU'EST-CE QU'UN PIX ?
+---------------------
+Les Pix sont des points de fidelite gagnes en jouant.
+
+COMMENT GAGNER DES PIX ?
+------------------------
+  +---------------+----------------+
+  | Action        | Pix gagnes     |
+  +---------------+----------------+
+  | Victoire      | +1 Pix         |
+  +---------------+----------------+
+
+UTILISATION DES PIX
+-------------------
+A definir (conversion en argent, achats in-app, etc.)
+
+
+================================================================================
+                           REGLES FINANCIERES
+================================================================================
+
+  +-------------------+----------------------------------+
+  | Operation         | Frais                            |
+  +-------------------+----------------------------------+
+  | Inscription       | Gratuit + 5 000F offerts         |
+  | Recharge          | 0F                               |
+  | Lancer une partie | 10F (debite avec la mise)        |
+  | Rejoindre partie  | 10F (debite avec la mise)        |
+  | Mise minimum      | 1 000F (+ 10F = 1 010F debites)  |
+  | Retrait           | 2% (frais Orange Money)          |
+  +-------------------+----------------------------------+
+
+MODELE DE REVENUS P2C
+---------------------
+  - Frais par partie : 10F par joueur (20F total par partie)
+  - Les frais de retrait (2%) sont reverses a Orange Money
+
+CALCUL DES GAINS
+----------------
+  - Gagnant : Recoit mise x 2 (sa mise + celle de l'adversaire)
+  - Perdant : Perd sa mise (deja debitee)
+  - Egalite : Partie rejouee, mises conservees
+
+EXEMPLE DE PARTIE
+-----------------
+  Joueur A mise 2 000F :
+    → Debite : 2 000F (mise) + 10F (frais) = 2 010F
+  Joueur B rejoint :
+    → Debite : 2 000F (mise) + 10F (frais) = 2 010F
+  Gagnant recoit : 4 000F (2 000F x 2)
+
+
+================================================================================
+                            STACK TECHNIQUE
+================================================================================
+
+MOBILE
+------
+  - React Native avec Expo
+  - TypeScript
+  - React Navigation
+
+BACKEND
+-------
+  - Firebase (Authentication, Firestore)
+  - API Node.js + Express sur Render
+  - Temps reel via Firestore listeners
+
+PAIEMENT
+--------
+  - Orange Money (via API ou simulation)
+  - PayDunya (integration possible)
+
+DEPLOIEMENT
+-----------
+  - EAS Build pour les APK Android
+  - Render pour l'API
+  - Firebase pour la base de donnees
+
+
+================================================================================
+                               SECURITE
+================================================================================
+
+  - Authentification Firebase securisee
+  - Tokens JWT pour l'API
+  - Transactions Firestore pour eviter les race conditions
+  - Validation cote serveur des mises et gains
+
+
+================================================================================
+                                ROADMAP
+================================================================================
+
+PHASE 1 - MVP (Actuel)
+----------------------
+  [X] Authentification
+  [X] Recharge Orange Money
+  [X] Liste des paris
+  [X] Jeu en temps reel
+  [X] Resultats et gains
+  [X] Systeme Pix (+1 Pix par victoire)
+  [X] Frais de partie (10F par joueur)
+  [ ] Correction bugs (gains gagnant, egalite)
+
+PHASE 2 - Ameliorations
+-----------------------
+  [ ] Retrait avec frais 2% Orange Money
+  [ ] Dashboard admin
+  [ ] MTN Money / Moov Money
+  [ ] Notifications push
+
+PHASE 3 - Croissance
+--------------------
+  [ ] Classement des joueurs
+  [ ] Systeme de niveaux
+  [ ] Tournois
+  [ ] Mode spectateur
+
+
+================================================================================
+                                CONTACT
+================================================================================
+
+Projet   : P2C - Pierre Papier Ciseaux
+Firebase : ppc-game-8b35f
+API      : https://ppc-game.onrender.com
+
+
+--------------------------------------------------------------------------------
+                    Document genere le 10 Fevrier 2026
+--------------------------------------------------------------------------------
