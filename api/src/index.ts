@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import authRoutes from './routes/auth';
 import transactionRoutes from './routes/transactions';
 import matchmakingRoutes from './routes/matchmaking';
@@ -42,7 +43,6 @@ app.get('/api/health', (_req, res) => {
 // Serve web dashboard (admin panel)
 const webDistPath = path.join(__dirname, '../../web/dist');
 console.log('Web dist path:', webDistPath);
-import fs from 'fs';
 const webDistExists = fs.existsSync(webDistPath);
 console.log('Web dist exists:', webDistExists);
 if (webDistExists) {
