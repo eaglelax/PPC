@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, AppState, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, AppState, Platform, ActivityIndicator, ScrollView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -44,6 +44,9 @@ export default function GameScreen({ navigation, route }: Props) {
   const [hasChosen, setHasChosen] = useState(false);
   const [showDraw, setShowDraw] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
+  const [screenError, setScreenError] = useState<string | null>(null);
+  const addLog = (msg: string) => setDebugLog(prev => [...prev.slice(-10), `${new Date().toLocaleTimeString()}: ${msg}`]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hasChosenRef = useRef(false);
   const timeoutFailCountRef = useRef(0);
@@ -143,10 +146,24 @@ export default function GameScreen({ navigation, route }: Props) {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
+  // Log mount
+  useEffect(() => {
+    addLog(`GameScreen mounted. gameId=${gameId}, user=${firebaseUser?.uid || 'null'}`);
+    return () => addLog('GameScreen unmounting');
+  }, []);
+
   // Listen for game updates
   useEffect(() => {
+    addLog('Starting Firestore listener...');
     const unsub = onGameUpdate(gameId, (g) => {
-      setGame(g);
+      try {
+        addLog(`Game update: status=${g?.status}, p1=${g?.player1?.userId?.slice(0,6)}, p2=${g?.player2?.userId?.slice(0,6)}`);
+        setGame(g);
+      } catch (e: any) {
+        addLog(`ERROR in game callback: ${e.message}`);
+        setScreenError(`Game callback: ${e.message}`);
+        return;
+      }
 
       if (g?.status === 'draw') {
         setShowDraw(true);
@@ -171,10 +188,12 @@ export default function GameScreen({ navigation, route }: Props) {
       }
 
       if (g?.status === 'resolved') {
+        addLog('Game resolved -> navigating to Result');
         navigation.replace('Result', { gameId });
       }
 
       if (g?.status === 'cancelled') {
+        addLog('Game cancelled -> showing alert');
         showAlert(
           'Partie annulee',
           'La partie a ete annulee. Votre remboursement sera effectue dans moins de 24h.',
@@ -183,12 +202,14 @@ export default function GameScreen({ navigation, route }: Props) {
       }
     }, (error) => {
       // Firestore connection lost
+      addLog(`LISTENER ERROR: ${error.message}`);
       console.error('Game listener error:', error);
+      setScreenError(`Firestore: ${error.message}`);
       setIsOffline(true);
       isOfflineRef.current = true;
       showAlert(
         'Connexion perdue',
-        'La connexion a ete perdue pendant la partie. Votre remboursement sera effectue dans moins de 24h.',
+        `Erreur: ${error.message}`,
         [{ text: 'OK', onPress: () => navigation.replace('Home') }]
       );
     });
@@ -285,17 +306,47 @@ export default function GameScreen({ navigation, route }: Props) {
     ]).start();
   };
 
+  if (screenError) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={{ color: '#e74c3c', fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>ERREUR GAMESCREEN</Text>
+        <Text style={{ color: '#fff', fontSize: 14, marginBottom: 12 }}>{screenError}</Text>
+        <ScrollView style={{ maxHeight: 200, width: '100%', padding: 10, backgroundColor: '#1a1a2e', borderRadius: 8 }}>
+          {debugLog.map((l, i) => <Text key={i} style={{ color: '#aaa', fontSize: 11, marginBottom: 4 }}>{l}</Text>)}
+        </ScrollView>
+        <TouchableOpacity onPress={() => navigation.replace('Home')} style={{ marginTop: 20, backgroundColor: COLORS.primary, padding: 12, borderRadius: 8 }}>
+          <Text style={{ color: '#fff', fontWeight: 'bold' }}>Retour accueil</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (!game || !firebaseUser) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Chargement de la partie...</Text>
+        <Text style={{ color: COLORS.textSecondary, fontSize: 11, marginTop: 8 }}>gameId: {gameId}</Text>
+        <ScrollView style={{ maxHeight: 150, width: '100%', padding: 10, marginTop: 12, backgroundColor: '#1a1a2e', borderRadius: 8 }}>
+          {debugLog.map((l, i) => <Text key={i} style={{ color: '#aaa', fontSize: 11, marginBottom: 4 }}>{l}</Text>)}
+        </ScrollView>
       </View>
     );
   }
 
-  const isPlayer1 = game.player1.userId === firebaseUser.uid;
-  const opponent = isPlayer1 ? game.player2 : game.player1;
+  let isPlayer1 = false;
+  let opponent = game.player2;
+  try {
+    isPlayer1 = game.player1?.userId === firebaseUser.uid;
+    opponent = isPlayer1 ? game.player2 : game.player1;
+    if (!opponent) {
+      setScreenError(`opponent is null. player1=${JSON.stringify(game.player1)}, player2=${JSON.stringify(game.player2)}`);
+      return null;
+    }
+  } catch (e: any) {
+    setScreenError(`Player check: ${e.message}. game=${JSON.stringify(game).slice(0, 200)}`);
+    return null;
+  }
 
   const selectedChoiceData = CHOICES.find((c) => c.key === selectedChoice);
 
