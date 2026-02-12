@@ -41,9 +41,21 @@ app.get('/api/health', (_req, res) => {
 
 // Serve web dashboard (admin panel)
 const webDistPath = path.join(__dirname, '../../web/dist');
+console.log('Web dist path:', webDistPath);
+import fs from 'fs';
+const webDistExists = fs.existsSync(webDistPath);
+console.log('Web dist exists:', webDistExists);
+if (webDistExists) {
+  console.log('Web dist contents:', fs.readdirSync(webDistPath));
+}
 app.use(express.static(webDistPath));
 app.get('*', (_req, res) => {
-  res.sendFile(path.join(webDistPath, 'index.html'));
+  const indexPath = path.join(webDistPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).json({ error: 'Dashboard not built', webDistPath, exists: webDistExists });
+  }
 });
 
 app.listen(PORT, () => {
