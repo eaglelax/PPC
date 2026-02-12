@@ -59,14 +59,23 @@ export default function BetScreen({ navigation }: Props) {
 
     setLoading(true);
     try {
-      const { betId } = await createBet(amount);
+      const result = await createBet(amount);
+      const betId = result?.betId;
+      if (!betId) {
+        showAlert('Erreur', `Reponse inattendue du serveur: ${JSON.stringify(result)}`);
+        return;
+      }
       // Close modal FIRST, then navigate after a short delay
       // Navigating while a Modal is open crashes on some Android devices
       setModalVisible(false);
       setBetAmount('');
       setTimeout(() => {
-        navigation.navigate('Waiting', { betId, betAmount: amount });
-      }, 100);
+        try {
+          navigation.navigate('Waiting', { betId, betAmount: amount });
+        } catch (navError: any) {
+          showAlert('Erreur navigation', navError.message || 'Erreur lors de la navigation.');
+        }
+      }, 150);
     } catch (error: any) {
       showAlert('Erreur', error.message || 'Erreur lors de la creation du pari.');
     } finally {
@@ -89,10 +98,19 @@ export default function BetScreen({ navigation }: Props) {
 
     setJoining(bet.id);
     try {
-      const { gameId } = await joinBet(bet.id);
-      navigation.replace('Game', { gameId });
+      const result = await joinBet(bet.id);
+      const gameId = result?.gameId;
+      if (!gameId) {
+        showAlert('Erreur', `Reponse inattendue du serveur: ${JSON.stringify(result)}`);
+        return;
+      }
+      try {
+        navigation.replace('Game', { gameId });
+      } catch (navError: any) {
+        showAlert('Erreur navigation', navError.message || 'Erreur lors de la navigation.');
+      }
     } catch (error: any) {
-      showAlert('Erreur', error.message);
+      showAlert('Erreur', error.message || 'Erreur inconnue.');
     } finally {
       setJoining(null);
     }
