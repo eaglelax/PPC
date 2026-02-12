@@ -138,19 +138,15 @@ export default function WaitingScreen({ navigation, route }: Props) {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.iconContainer, {
-        transform: [{ scale: pulseAnim }],
-        shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.4,
-        shadowRadius: 30,
-      }]}>
-        <Image
-          source={require('../../assets/P2C_Icon_Only.png')}
-          style={styles.shieldLogo}
-          resizeMode="contain"
-        />
-      </Animated.View>
+      <View style={styles.iconContainer}>
+        <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+          <Image
+            source={require('../../assets/P2C_Icon_Only.png')}
+            style={styles.shieldLogo}
+            resizeMode="contain"
+          />
+        </Animated.View>
+      </View>
 
       <Text style={styles.title}>Recherche d'un adversaire</Text>
       <AnimatedDots />
