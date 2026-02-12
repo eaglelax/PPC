@@ -2,11 +2,12 @@ import admin from 'firebase-admin';
 
 // Initialize Firebase Admin SDK
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  // Fix: Render env vars store \n as literal strings, Firebase needs real newlines
-  if (serviceAccount.private_key) {
-    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+  // Support both raw JSON and base64-encoded JSON
+  let raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!raw.startsWith('{')) {
+    raw = Buffer.from(raw, 'base64').toString('utf-8');
   }
+  const serviceAccount = JSON.parse(raw);
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
