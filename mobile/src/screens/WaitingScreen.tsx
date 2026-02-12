@@ -126,9 +126,14 @@ export default function WaitingScreen({ navigation, route }: Props) {
   }, [navigation, betId]);
 
   // Auto-cancel bet when app goes to background
+  // Use 'inactive' -> 'background' transition to avoid false triggers on Android
+  const appStateRef = useRef(AppState.currentState);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'background' && !matchedRef.current && !cancellingRef.current) {
+      const prevState = appStateRef.current;
+      appStateRef.current = nextState;
+      // Only cancel if truly going to background from active state
+      if (prevState === 'active' && nextState === 'background' && !matchedRef.current && !cancellingRef.current) {
         cancellingRef.current = true;
         cancelBet(betId).catch(() => {});
         navigation.goBack();

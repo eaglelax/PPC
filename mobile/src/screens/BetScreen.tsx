@@ -60,11 +60,15 @@ export default function BetScreen({ navigation }: Props) {
     setLoading(true);
     try {
       const { betId } = await createBet(amount);
+      // Close modal FIRST, then navigate after a short delay
+      // Navigating while a Modal is open crashes on some Android devices
       setModalVisible(false);
       setBetAmount('');
-      navigation.navigate('Waiting', { betId, betAmount: amount });
+      setTimeout(() => {
+        navigation.navigate('Waiting', { betId, betAmount: amount });
+      }, 100);
     } catch (error: any) {
-      showAlert('Erreur', error.message);
+      showAlert('Erreur', error.message || 'Erreur lors de la creation du pari.');
     } finally {
       setLoading(false);
     }

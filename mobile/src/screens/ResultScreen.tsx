@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -164,7 +164,7 @@ export default function ResultScreen({ navigation, route }: Props) {
     const target = isWin ? game.betAmount * 2 : game.betAmount;
 
     if (isWin) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
     }
 
     // Counter animation
@@ -184,7 +184,13 @@ export default function ResultScreen({ navigation, route }: Props) {
     return () => clearInterval(interval);
   }, [game, firebaseUser]);
 
-  if (!game || !firebaseUser) return null;
+  if (!game || !firebaseUser) {
+    return (
+      <View style={[styles.container, { alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   const isPlayer1 = game.player1.userId === firebaseUser.uid;
   const myData = isPlayer1 ? game.player1 : game.player2;
