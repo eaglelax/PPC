@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import authRoutes from './routes/auth';
 import transactionRoutes from './routes/transactions';
 import matchmakingRoutes from './routes/matchmaking';
@@ -36,6 +37,13 @@ app.use('/api/genius-pay', geniusPayRoutes);
 // Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Serve web dashboard (admin panel)
+const webDistPath = path.join(__dirname, '../../web/dist');
+app.use(express.static(webDistPath));
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(webDistPath, 'index.html'));
 });
 
 app.listen(PORT, () => {

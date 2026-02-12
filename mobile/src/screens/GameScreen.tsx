@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated, AppState, Platform,
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import NetInfo from '@react-native-community/netinfo';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
@@ -96,22 +95,6 @@ export default function GameScreen({ navigation, route }: Props) {
       }).start();
     }
   }, [game?.round, roundAnim]);
-
-  // Network connectivity monitoring
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener((state) => {
-      const offline = !(state.isConnected && state.isInternetReachable !== false);
-      isOfflineRef.current = offline;
-      setIsOffline(offline);
-
-      // When coming back online, try to cancel stale game if we've been stuck
-      if (!offline && game?.status === 'choosing' && timeoutFailCountRef.current > 0) {
-        timeoutFailCountRef.current = 0;
-        cancelStaleGame(gameId).catch(() => {});
-      }
-    });
-    return () => unsubscribe();
-  }, [gameId, game?.status]);
 
   // Auto-cancel when app goes to background during game
   useEffect(() => {

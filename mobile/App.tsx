@@ -41,10 +41,7 @@ function GlobalErrorScreen({ error, onDismiss }: { error: string; onDismiss: () 
 const crashStyles = RNStyleSheet.create({
   overlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.85)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -67,26 +64,15 @@ const crashStyles = RNStyleSheet.create({
     marginBottom: 12,
     textAlign: 'center',
   },
-  scrollBox: {
-    maxHeight: 200,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: '#ffffff',
-    fontSize: 13,
-    lineHeight: 18,
-  },
+  scrollBox: { maxHeight: 200, marginBottom: 16 },
+  errorText: { color: '#ffffff', fontSize: 13, lineHeight: 18 },
   button: {
     backgroundColor: '#e74c3c',
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
   },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  buttonText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' },
 });
 
 function AppNavigator() {
@@ -145,48 +131,51 @@ export default function App() {
 
   // Catch ALL unhandled JS errors and promise rejections
   useEffect(() => {
-    // Catch unhandled promise rejections (e.g. failed API calls, Firestore errors)
-    const rejectionHandler = (event: any) => {
-      const reason = event?.reason || event;
-      const msg = reason?.message || reason?.toString?.() || 'Unknown promise rejection';
-      const stack = reason?.stack || '';
-      console.error('[GLOBAL] Unhandled rejection:', msg);
-      setGlobalError(`[Promise] ${msg}\n\n${stack.slice(0, 300)}`);
+    const g = global as any;
+
+    // 1. Catch unhandled promise rejections
+    const origRejHandler = g.onunhandledrejection;
+    g.onunhandledrejection = (e: any) => {
+      const reason = e?.reason || e;
+      const msg = reason?.message || reason?.toString?.() || 'Unknown rejection';
+      setGlobalError('[Promise] ' + msg);
+      if (origRejHandler) origRejHandler(e);
     };
 
-    // For web
-    if (Platform.OS === 'web') {
-      window.addEventListener('unhandledrejection', rejectionHandler);
-      return () => window.removeEventListener('unhandledrejection', rejectionHandler);
-    }
-
-    // For React Native (Hermes)
-    const g = global as any;
-    if (typeof g.HermesInternal !== 'undefined') {
-      // Hermes supports tracking promise rejections
-      const origHandler = g.onunhandledrejection;
-      g.onunhandledrejection = (e: any) => {
-        rejectionHandler(e);
-        if (origHandler) origHandler(e);
-      };
-      return () => { g.onunhandledrejection = origHandler; };
-    }
-
-    // Fallback: Override the default ErrorUtils global handler
+    // 2. Override global error handler (catches fatal + non-fatal JS errors)
+    let origErrorHandler: any = null;
     if (g.ErrorUtils) {
-      const origHandler = g.ErrorUtils.getGlobalHandler();
+      origErrorHandler = g.ErrorUtils.getGlobalHandler();
       g.ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
         const msg = error?.message || 'Unknown error';
         const stack = error?.stack || '';
-        console.error('[GLOBAL] JS error:', msg, isFatal ? '(FATAL)' : '');
-        setGlobalError(`${isFatal ? '[FATAL] ' : ''}${msg}\n\n${stack.slice(0, 300)}`);
-        // Don't call the original handler for non-fatal - it would crash the app
-        if (isFatal && origHandler) {
-          origHandler(error, isFatal);
+        setGlobalError((isFatal ? '[FATAL] ' : '[Error] ') + msg + '\n\n' + stack.slice(0, 300));
+        // Don't call original for non-fatal to prevent crash
+        if (isFatal && origErrorHandler) {
+          origErrorHandler(error, isFatal);
         }
       });
-      return () => { g.ErrorUtils.setGlobalHandler(origHandler); };
     }
+
+    // 3. Web fallback
+    if (Platform.OS === 'web') {
+      const webHandler = (event: any) => {
+        const reason = event?.reason || event;
+        const msg = reason?.message || reason?.toString?.() || 'Unknown';
+        setGlobalError('[Web] ' + msg);
+      };
+      window.addEventListener('unhandledrejection', webHandler);
+      return () => {
+        window.removeEventListener('unhandledrejection', webHandler);
+        g.onunhandledrejection = origRejHandler;
+        if (g.ErrorUtils && origErrorHandler) g.ErrorUtils.setGlobalHandler(origErrorHandler);
+      };
+    }
+
+    return () => {
+      g.onunhandledrejection = origRejHandler;
+      if (g.ErrorUtils && origErrorHandler) g.ErrorUtils.setGlobalHandler(origErrorHandler);
+    };
   }, []);
 
   if (!fontsLoaded) {
