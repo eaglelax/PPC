@@ -1,0 +1,13 @@
+{
+  "name": "ppc",
+  "private": true,
+  "scripts": {
+    "install:api": "cd api && npm install",
+    "install:web": "cd web && npm install",
+    "build:api": "cd api && npm run build",
+    "build:web": "cd web && npm run build",
+    "build": "npm run install:api && npm run install:web && npm run build:web && npm run build:api",
+    "start": "cd api && npm start",
+    "postinstall": "npm run build"
+  }
+}
