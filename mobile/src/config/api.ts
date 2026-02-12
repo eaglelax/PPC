@@ -8,6 +8,8 @@ const DEV_API_URL = `http://${DEV_HOST}:3001/api`;
 
 export const API_BASE = PROD_API_URL;
 
+const API_TIMEOUT = 45000; // 45s (Render cold start can take 30s+)
+
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const user = auth.currentUser;
   if (!user) throw new Error('Non authentifie.');
@@ -18,22 +20,47 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   };
 }
 
+async function safeFetch(url: string, options?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return res;
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new Error('Le serveur met du temps a repondre. Veuillez reessayer.');
+    }
+    throw new Error('Erreur reseau. Verifiez votre connexion internet.');
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function parseJSON(res: Response) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('Le serveur est en cours de demarrage. Veuillez reessayer dans quelques secondes.');
+  }
+}
+
 async function apiGet(endpoint: string) {
   const headers = await getAuthHeaders();
-  const res = await fetch(`${API_BASE}${endpoint}`, { headers });
-  const data = await res.json();
+  const res = await safeFetch(`${API_BASE}${endpoint}`, { headers });
+  const data = await parseJSON(res);
   if (!res.ok) throw new Error(data.error || 'Erreur serveur');
   return data;
 }
 
 async function apiPost(endpoint: string, body?: any) {
   const headers = await getAuthHeaders();
-  const res = await fetch(`${API_BASE}${endpoint}`, {
+  const res = await safeFetch(`${API_BASE}${endpoint}`, {
     method: 'POST',
     headers,
     body: body ? JSON.stringify(body) : undefined,
   });
-  const data = await res.json();
+  const data = await parseJSON(res);
   if (!res.ok) throw new Error(data.error || 'Erreur serveur');
   return data;
 }

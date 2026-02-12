@@ -10,6 +10,8 @@ import { db, auth } from '../config/firebase';
 import { API_BASE } from '../config/api';
 import { Bet } from '../types';
 
+const API_TIMEOUT = 45000;
+
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const user = auth.currentUser;
   if (!user) throw new Error('Non authentifie.');
@@ -20,46 +22,68 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   };
 }
 
-export async function fetchBets(): Promise<Bet[]> {
-  const res = await fetch(`${API_BASE}/bets`);
-  if (!res.ok) {
-    const data = await res.json();
-    throw new Error(data.error || 'Erreur lors du chargement des paris.');
+async function safeFetch(url: string, options?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new Error('Le serveur met du temps a repondre. Veuillez reessayer.');
+    }
+    throw new Error('Erreur reseau. Verifiez votre connexion internet.');
+  } finally {
+    clearTimeout(timeout);
   }
-  return res.json();
+}
+
+async function parseJSON(res: Response) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('Le serveur est en cours de demarrage. Veuillez reessayer dans quelques secondes.');
+  }
+}
+
+export async function fetchBets(): Promise<Bet[]> {
+  const res = await safeFetch(`${API_BASE}/bets`);
+  const data = await parseJSON(res);
+  if (!res.ok) throw new Error(data.error || 'Erreur lors du chargement des paris.');
+  return data;
 }
 
 export async function createBet(amount: number): Promise<{ betId: string }> {
   const headers = await getAuthHeaders();
-  const res = await fetch(`${API_BASE}/bets`, {
+  const res = await safeFetch(`${API_BASE}/bets`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ amount }),
   });
-  const data = await res.json();
+  const data = await parseJSON(res);
   if (!res.ok) throw new Error(data.error || 'Erreur lors de la creation du pari.');
   return data;
 }
 
 export async function joinBet(betId: string): Promise<{ gameId: string }> {
   const headers = await getAuthHeaders();
-  const res = await fetch(`${API_BASE}/bets/${betId}/join`, {
+  const res = await safeFetch(`${API_BASE}/bets/${betId}/join`, {
     method: 'POST',
     headers,
   });
-  const data = await res.json();
+  const data = await parseJSON(res);
   if (!res.ok) throw new Error(data.error || 'Erreur lors de la jonction au pari.');
   return data;
 }
 
 export async function cancelBet(betId: string): Promise<void> {
   const headers = await getAuthHeaders();
-  const res = await fetch(`${API_BASE}/bets/${betId}`, {
+  const res = await safeFetch(`${API_BASE}/bets/${betId}`, {
     method: 'DELETE',
     headers,
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Erreur lors de l\'annulation du pari.');
+  const data = await parseJSON(res);
+  if (!res.ok) throw new Error(data.error || "Erreur lors de l'annulation du pari.");
 }
 
 export async function withdrawFunds(
@@ -68,20 +92,21 @@ export async function withdrawFunds(
   phone: string
 ): Promise<{ amount: number; fee: number; netAmount: number; payoutStatus?: string; payoutReference?: string }> {
   const headers = await getAuthHeaders();
-  const res = await fetch(`${API_BASE}/wallet/withdraw`, {
+  const res = await safeFetch(`${API_BASE}/wallet/withdraw`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ amount, method, phone }),
   });
-  const data = await res.json();
+  const data = await parseJSON(res);
   if (!res.ok) throw new Error(data.error || 'Erreur lors du retrait.');
   return data;
 }
 
 export async function getWithdrawalFee(): Promise<{ percent: number }> {
-  const res = await fetch(`${API_BASE}/settings/withdrawal_fee`);
+  const res = await safeFetch(`${API_BASE}/settings/withdrawal_fee`);
+  const data = await parseJSON(res);
   if (!res.ok) throw new Error('Erreur lors du chargement des frais.');
-  return res.json();
+  return data;
 }
 
 // Real-time listener for available bets
