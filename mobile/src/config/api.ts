@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { auth } from './firebase';
 
-const PROD_API_URL = 'https://ppc-7o2f.onrender.com/api';
+const PROD_API_URL = 'https://ppc-rnft.onrender.com/api';
 
 const DEV_HOST = Platform.OS === 'android' ? '192.168.11.228' : 'localhost';
 const DEV_API_URL = `http://${DEV_HOST}:3001/api`;
