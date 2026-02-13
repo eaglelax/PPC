@@ -1,10 +1,16 @@
 export interface UserData {
   odId: string;
-  email: string;
+  email?: string;
   displayName: string;
   phone: string;
   balance: number;
   pix: number;
+  referralCode?: string;
+  referredBy?: string | null;
+  referralStats?: {
+    referralsCount: number;
+    pixEarned: number;
+  };
   createdAt: Date;
   stats: {
     gamesPlayed: number;
@@ -67,6 +73,18 @@ export interface Transaction {
   createdAt: Date;
 }
 
+export interface ReferralInfo {
+  displayName: string;
+  joinedAt: Date;
+  gamesPlayed: number;
+  wins: number;
+  rewards: {
+    firstRecharge: boolean;
+    lastGameRewardAt: number;
+    fiftyWins: boolean;
+  };
+}
+
 export type RootStackParamList = {
   Auth: undefined;
   Home: undefined;
@@ -76,4 +94,6 @@ export type RootStackParamList = {
   Result: { gameId: string };
   Recharge: undefined;
   Withdraw: undefined;
+  Referral: undefined;
+  History: undefined;
 };

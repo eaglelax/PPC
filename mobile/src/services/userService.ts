@@ -1,25 +1,16 @@
-import { doc, setDoc, getDoc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { registerProfile } from '../config/api';
 import { UserData } from '../types';
-import { INITIAL_BALANCE } from '../config/theme';
 
 const USERS_COLLECTION = 'users';
 
-export async function createUser(uid: string, email: string, displayName: string, phone: string): Promise<void> {
-  const userRef = doc(db, USERS_COLLECTION, uid);
-  await setDoc(userRef, {
-    odId: uid,
-    email,
-    displayName,
-    phone,
-    balance: INITIAL_BALANCE,
-    createdAt: serverTimestamp(),
-    stats: {
-      gamesPlayed: 0,
-      wins: 0,
-      losses: 0,
-    },
-  });
+export async function createUser(displayName: string, email?: string, referralCode?: string): Promise<void> {
+  // Registration goes through the API which handles:
+  // - Creating user in Firestore with referralCode, referredBy, referralStats
+  // - Validating referral code if provided
+  // - Getting phone from Firebase Auth user
+  await registerProfile(displayName, email, referralCode);
 }
 
 export async function getUser(uid: string): Promise<UserData | null> {

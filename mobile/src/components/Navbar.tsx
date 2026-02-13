@@ -6,7 +6,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { COLORS, SPACING, FONT_FAMILY } from '../config/theme';
 import { RootStackParamList } from '../types';
 
-type NavScreen = 'Home' | 'Bet' | 'Recharge' | 'Withdraw';
+type NavScreen = 'Home' | 'Bet' | 'Recharge' | 'Withdraw' | 'History';
 
 type Props = {
   active: NavScreen;
@@ -17,6 +17,7 @@ const TABS: { key: NavScreen; label: string; iconOutline: keyof typeof Ionicons.
   { key: 'Bet', label: 'Jouer', iconOutline: 'game-controller-outline', iconSolid: 'game-controller' },
   { key: 'Recharge', label: 'Recharger', iconOutline: 'wallet-outline', iconSolid: 'wallet' },
   { key: 'Withdraw', label: 'Retirer', iconOutline: 'cash-outline', iconSolid: 'cash' },
+  { key: 'History', label: 'Historique', iconOutline: 'time-outline', iconSolid: 'time' },
 ];
 
 export default function Navbar({ active }: Props) {

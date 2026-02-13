@@ -54,6 +54,7 @@ export async function withdraw(userId: string, amount: number, method: string, p
       const disbursement = await createDisbursement(config, {
         amount: netAmount,
         phone,
+        provider: method,
         description: `Retrait P2C - ${netAmount}F`,
         metadata: { userId, type: 'withdrawal' },
       });

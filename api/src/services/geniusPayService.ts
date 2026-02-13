@@ -47,6 +47,7 @@ export interface CreateDisbursementParams {
   amount: number;
   currency?: string;
   phone: string;
+  provider?: string; // wave, orange_money, mtn_money
   description: string;
   metadata?: Record<string, string>;
 }
@@ -146,16 +147,26 @@ export async function createPayment(
   config: GeniusPayConfig,
   params: CreatePaymentParams
 ): Promise<GeniusPayment> {
-  const response = await geniusRequest(config, 'POST', '/payments', {
+  const body: Record<string, any> = {
     amount: params.amount,
     currency: params.currency || 'XOF',
     description: params.description,
-    customer_email: params.customer_email,
-    customer_name: params.customer_name,
-    callback_url: params.callback_url,
-    return_url: params.return_url,
     metadata: params.metadata,
-  });
+  };
+
+  // Real API uses success_url / error_url (not callback_url / return_url)
+  if (params.callback_url) body.success_url = params.callback_url;
+  if (params.return_url) body.error_url = params.return_url;
+
+  // Customer info
+  if (params.customer_email || params.customer_name) {
+    body.customer = {
+      ...(params.customer_name && { name: params.customer_name }),
+      ...(params.customer_email && { email: params.customer_email }),
+    };
+  }
+
+  const response = await geniusRequest(config, 'POST', '/payments', body);
 
   // GeniusPay wraps response in { success, data: { ... } }
   const d = response.data || response;
@@ -164,7 +175,7 @@ export async function createPayment(
     amount: d.amount,
     currency: d.currency || 'XOF',
     status: d.status || 'pending',
-    checkout_url: d.checkout_url,
+    checkout_url: d.checkout_url || d.payment_url || '',
     payment_method: d.gateway,
     created_at: d.created_at,
   };
@@ -181,6 +192,7 @@ export async function createDisbursement(
       amount: params.amount,
       currency: params.currency || 'XOF',
       phone: params.phone,
+      provider: params.provider || 'wave',
       description: params.description,
       metadata: params.metadata,
     });
@@ -228,13 +240,20 @@ export async function getPaymentStatus(
 export function verifyWebhookSignature(
   payload: string,
   signature: string,
-  secret: string
+  secret: string,
+  timestamp?: string
 ): boolean {
+  // Real API signs: HMAC-SHA256(timestamp + "." + payload, secret)
+  const message = timestamp ? `${timestamp}.${payload}` : payload;
   const computed = crypto
     .createHmac('sha256', secret)
-    .update(payload)
+    .update(message)
     .digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(signature));
+  try {
+    return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(signature));
+  } catch {
+    return false;
+  }
 }
 
 // ─── Demo Mode Helpers ─────────────────────────────────────────────────────

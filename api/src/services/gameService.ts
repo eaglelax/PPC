@@ -2,6 +2,7 @@ import admin, { db } from '../config/firebase';
 import { Choice } from '../config/constants';
 import { updateBalance, getUser, updateStats } from './userService';
 import { createTransaction } from './transactionService';
+import { checkGameMilestoneReward } from './referralService';
 
 const GAMES = 'games';
 
@@ -106,6 +107,10 @@ export async function makeChoice(gameId: string, userId: string, choice: Choice)
     await createTransaction(loserId, 'loss', betAmount);
     await updateStats(winnerId, true);
     await updateStats(loserId, false);
+
+    // Check referral milestones for both players
+    checkGameMilestoneReward(winnerId).catch(() => {});
+    checkGameMilestoneReward(loserId).catch(() => {});
   }
 
   if (result.status === 'draw') {

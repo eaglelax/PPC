@@ -13,6 +13,10 @@ const firebaseConfig = {
   measurementId: "G-JRWKGPX1KF"
 };
 
+// Google Sign-In: web client ID from Firebase Console > Authentication > Google provider
+// Format: 247217057345-XXXXX.apps.googleusercontent.com
+export const GOOGLE_WEB_CLIENT_ID = '247217057345-REPLACE_ME.apps.googleusercontent.com';
+
 const USE_EMULATORS = false; // Set to __DEV__ to use local emulators
 const EMULATOR_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 

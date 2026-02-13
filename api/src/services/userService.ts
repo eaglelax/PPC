@@ -1,21 +1,38 @@
 import { db } from '../config/firebase';
 import { INITIAL_BALANCE } from '../config/constants';
+import { generateUniqueReferralCode } from './referralService';
 
 const USERS = 'users';
 
-export async function createUser(uid: string, email: string, displayName: string) {
+export async function createUser(uid: string, email: string = '', displayName: string, referredBy: string | null = null, phone: string | null = null) {
   const userRef = db.collection(USERS).doc(uid);
   const existing = await userRef.get();
   if (existing.exists) {
-    throw new Error('Utilisateur deja existant.');
+    // User already exists (created by mobile client) - update with referral fields
+    const existingData = existing.data()!;
+    if (!existingData.referralCode) {
+      const referralCode = await generateUniqueReferralCode();
+      await userRef.update({
+        referralCode,
+        referredBy: referredBy || null,
+        referralStats: { referralsCount: 0, pixEarned: 0 },
+      });
+    }
+    return existingData;
   }
+
+  const referralCode = await generateUniqueReferralCode();
 
   const userData = {
     odId: uid,
     email,
     displayName,
+    phone: phone || null,
     balance: INITIAL_BALANCE,
     pix: 0,
+    referralCode,
+    referredBy: referredBy || null,
+    referralStats: { referralsCount: 0, pixEarned: 0 },
     createdAt: new Date(),
     stats: { gamesPlayed: 0, wins: 0, losses: 0 },
   };

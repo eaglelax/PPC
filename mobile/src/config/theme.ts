@@ -53,7 +53,7 @@ export const SPACING = {
   xxl: 48,
 };
 
-export const INITIAL_BALANCE = 5000;
+export const INITIAL_BALANCE = 0;
 export const RECHARGE_FEE = 0;
 export const CHOICE_TIMER = 30;
 export const MIN_BET_AMOUNT = 1000;

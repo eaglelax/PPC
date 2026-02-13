@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -12,6 +13,7 @@ import walletRoutes from './routes/wallet';
 import settingsRoutes from './routes/settings';
 import orangeMoneyRoutes from './routes/orangeMoney';
 import geniusPayRoutes from './routes/geniusPay';
+import referralRoutes from './routes/referral';
 import { startGameCleanup } from './services/gameCleanup';
 // import paydunyaRoutes from './routes/paydunya'; // Replaced by Orange Money
 
@@ -33,6 +35,7 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/orange-money', orangeMoneyRoutes);
 app.use('/api/genius-pay', geniusPayRoutes);
+app.use('/api/referral', referralRoutes);
 // app.use('/api/payments/paydunya', paydunyaRoutes); // Replaced by Orange Money
 
 // Health check

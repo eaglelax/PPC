@@ -1,6 +1,7 @@
 import { db } from '../config/firebase';
 import { RECHARGE_FEE, TransactionType } from '../config/constants';
 import { updateBalance, getUser } from './userService';
+import { checkFirstRechargeReward } from './referralService';
 
 const TRANSACTIONS = 'transactions';
 
@@ -33,6 +34,9 @@ export async function rechargeBalance(userId: string, amount: number) {
 
   await updateBalance(userId, newBalance);
   await createTransaction(userId, 'recharge', amount, RECHARGE_FEE);
+
+  // Check referral reward for first recharge
+  checkFirstRechargeReward(userId, amount).catch(() => {});
 
   return { newBalance, netAmount, fee: RECHARGE_FEE };
 }

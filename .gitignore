@@ -53,6 +53,7 @@ image.png
 image copy*.png
 
 # Sensitive files
+api/local-credentials.json
 api/auth_resp.json
 api/token.txt
 api/token_new.txt

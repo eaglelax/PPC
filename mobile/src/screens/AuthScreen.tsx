@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,65 +13,225 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import {
+  signInWithCustomToken,
+  signInWithCredential,
+  GoogleAuthProvider,
+  signInWithPopup,
+} from 'firebase/auth';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import { auth, GOOGLE_WEB_CLIENT_ID } from '../config/firebase';
+import { sendOtp, verifyOtp, validateReferralCode } from '../config/api';
 import { createUser } from '../services/userService';
+import { useAuth } from '../contexts/AuthContext';
 import { COLORS, FONTS, SPACING, FONT_FAMILY } from '../config/theme';
 import { showAlert } from '../utils/alert';
 import { ORANGE_MONEY_COUNTRIES, DEFAULT_COUNTRY, Country } from '../config/countries';
 import GradientButton from '../components/GradientButton';
 import LoadingScreen from '../components/LoadingScreen';
 
+WebBrowser.maybeCompleteAuthSession();
+
+type Step = 'phone' | 'otp' | 'profile';
+
 export default function AuthScreen() {
+  const { needsProfile, firebaseUser } = useAuth();
+
+  // Step management
+  const [step, setStep] = useState<Step>(needsProfile ? 'profile' : 'phone');
+
+  // Phone step
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
   const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
   const [countryPickerVisible, setCountryPickerVisible] = useState(false);
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async () => {
-    if (!email.trim() || !password.trim()) {
-      showAlert('Erreur', 'Veuillez remplir tous les champs.');
-      return;
+  // OTP step
+  const [otpCode, setOtpCode] = useState('');
+  const [testCode, setTestCode] = useState('');
+  const [resendTimer, setResendTimer] = useState(0);
+
+  // Profile step
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [referralCode, setReferralCode] = useState('');
+  const [referralValid, setReferralValid] = useState<boolean | null>(null);
+  const [referrerName, setReferrerName] = useState('');
+  const [referralChecking, setReferralChecking] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+  const referralTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Google Sign-In (native only - web uses signInWithPopup)
+  const [, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({
+    clientId: GOOGLE_WEB_CLIENT_ID,
+  });
+
+  // Handle Google auth response (native)
+  useEffect(() => {
+    if (googleResponse?.type === 'success') {
+      const { id_token } = googleResponse.params;
+      const credential = GoogleAuthProvider.credential(id_token);
+      setLoading(true);
+      signInWithCredential(auth, credential)
+        .catch((err: Error) => {
+          showAlert('Erreur', err.message || 'Erreur de connexion Google.');
+        })
+        .finally(() => setLoading(false));
     }
-    if (!isLogin && !displayName.trim()) {
-      showAlert('Erreur', 'Veuillez entrer un pseudo.');
-      return;
+  }, [googleResponse]);
+
+  // If needsProfile changes to true, jump to profile & pre-fill from Google data
+  useEffect(() => {
+    if (needsProfile) {
+      setStep('profile');
+      if (firebaseUser?.displayName && !displayName) {
+        setDisplayName(firebaseUser.displayName);
+      }
+      if (firebaseUser?.email && !email) {
+        setEmail(firebaseUser.email);
+      }
     }
-    if (!isLogin && phone.length < 8) {
+  }, [needsProfile]);
+
+  // Resend timer countdown
+  useEffect(() => {
+    if (resendTimer <= 0) return;
+    const interval = setInterval(() => {
+      setResendTimer((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendTimer]);
+
+  const fullPhone = country.dialCode + phone.trim();
+
+  // Google Sign-In handler
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    try {
+      if (Platform.OS === 'web') {
+        const provider = new GoogleAuthProvider();
+        await signInWithPopup(auth, provider);
+        // onAuthStateChanged will fire → needsProfile will be checked
+      } else {
+        await promptGoogleAsync();
+        // Response handled in useEffect above
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erreur de connexion Google.';
+      showAlert('Erreur', message);
+    } finally {
+      // For native, loading state is managed by the useEffect
+      if (Platform.OS === 'web') setLoading(false);
+    }
+  };
+
+  const handleSendOtp = async () => {
+    if (phone.length < 8) {
       showAlert('Erreur', 'Veuillez entrer un numero de telephone valide.');
-      return;
-    }
-    if (password.length < 6) {
-      showAlert('Erreur', 'Le mot de passe doit contenir au moins 6 caracteres.');
       return;
     }
 
     setLoading(true);
     try {
-      if (isLogin) {
-        await signInWithEmailAndPassword(auth, email.trim(), password);
-      } else {
-        const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
-        const fullPhone = country.dialCode + phone.trim();
-        await createUser(credential.user.uid, email.trim(), displayName.trim(), fullPhone);
+      const result = await sendOtp(fullPhone, !isLogin);
+      setTestCode(result.code || '');
+      setStep('otp');
+      setResendTimer(60);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Une erreur est survenue.';
+      showAlert('Erreur', message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendTimer > 0) return;
+    setLoading(true);
+    try {
+      const result = await sendOtp(fullPhone, !isLogin);
+      setTestCode(result.code || '');
+      setOtpCode('');
+      setResendTimer(60);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Une erreur est survenue.';
+      showAlert('Erreur', message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (otpCode.length !== 6) {
+      showAlert('Erreur', 'Veuillez entrer le code a 6 chiffres.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await verifyOtp(fullPhone, otpCode);
+      await signInWithCustomToken(auth, result.token);
+
+      if (result.isNewUser) {
+        setStep('profile');
       }
-    } catch (error: any) {
-      let message = 'Une erreur est survenue.';
-      if (error.code === 'auth/email-already-in-use') {
-        message = 'Cet email est deja utilise.';
-      } else if (error.code === 'auth/invalid-email') {
-        message = 'Email invalide.';
-      } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        message = 'Email ou mot de passe incorrect.';
-      } else if (error.code === 'auth/user-not-found') {
-        message = 'Aucun compte trouve avec cet email.';
-      } else if (error.message) {
-        message = error.message;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Une erreur est survenue.';
+      showAlert('Erreur', message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReferralCodeChange = (text: string) => {
+    const upper = text.toUpperCase();
+    setReferralCode(upper);
+    setReferralValid(null);
+    setReferrerName('');
+
+    if (referralTimer.current) clearTimeout(referralTimer.current);
+
+    if (!upper || upper.length < 10) {
+      return;
+    }
+
+    setReferralChecking(true);
+    referralTimer.current = setTimeout(async () => {
+      try {
+        const result = await validateReferralCode(upper);
+        setReferralValid(result.valid);
+        if (result.valid && result.referrerName) {
+          setReferrerName(result.referrerName);
+        }
+      } catch {
+        setReferralValid(false);
+      } finally {
+        setReferralChecking(false);
       }
+    }, 500);
+  };
+
+  const handleCreateProfile = async () => {
+    if (!displayName.trim()) {
+      showAlert('Erreur', 'Veuillez entrer un pseudo.');
+      return;
+    }
+    if (referralCode && referralValid === false) {
+      showAlert('Erreur', 'Le code parrain est invalide. Corrigez-le ou laissez le champ vide.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await createUser(
+        displayName.trim(),
+        email.trim() || undefined,
+        referralValid ? referralCode : undefined,
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Une erreur est survenue.';
       showAlert('Erreur', message);
     } finally {
       setLoading(false);
@@ -79,7 +239,12 @@ export default function AuthScreen() {
   };
 
   if (loading) {
-    return <LoadingScreen message={isLogin ? 'Connexion...' : 'Creation du compte...'} />;
+    const messages: Record<Step, string> = {
+      phone: 'Envoi du code...',
+      otp: 'Verification...',
+      profile: 'Creation du compte...',
+    };
+    return <LoadingScreen message={messages[step]} />;
   }
 
   return (
@@ -102,18 +267,41 @@ export default function AuthScreen() {
           <Text style={styles.subtitle}>Pierre - Papier - Ciseaux</Text>
         </View>
 
-        <View style={styles.form}>
-          {!isLogin && (
-            <TextInput
-              style={styles.input}
-              placeholder="Pseudo"
-              placeholderTextColor={COLORS.textSecondary}
-              value={displayName}
-              onChangeText={setDisplayName}
-              autoCapitalize="none"
-            />
-          )}
-          {!isLogin && (
+        {/* STEP: PHONE */}
+        {step === 'phone' && (
+          <View style={styles.form}>
+            {/* Mode toggle tabs */}
+            <View style={styles.modeTabs}>
+              <TouchableOpacity
+                style={[styles.modeTab, isLogin && styles.modeTabActive]}
+                onPress={() => setIsLogin(true)}
+              >
+                <Text style={[styles.modeTabText, isLogin && styles.modeTabTextActive]}>Connexion</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modeTab, !isLogin && styles.modeTabActive]}
+                onPress={() => setIsLogin(false)}
+              >
+                <Text style={[styles.modeTabText, !isLogin && styles.modeTabTextActive]}>Inscription</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Google Sign-In */}
+            <TouchableOpacity style={styles.googleButton} onPress={handleGoogleSignIn}>
+              <Ionicons name="logo-google" size={20} color={COLORS.text} />
+              <Text style={styles.googleButtonText}>
+                {isLogin ? 'Se connecter avec Google' : "S'inscrire avec Google"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Divider */}
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>ou par telephone</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Phone input */}
             <View style={styles.phoneRow}>
               <TouchableOpacity
                 style={styles.countrySelector}
@@ -132,41 +320,112 @@ export default function AuthScreen() {
                 keyboardType="phone-pad"
               />
             </View>
-          )}
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor={COLORS.textSecondary}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Mot de passe"
-            placeholderTextColor={COLORS.textSecondary}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
 
-          <GradientButton
-            title={loading ? 'Chargement...' : isLogin ? 'Se connecter' : "S'inscrire"}
-            onPress={handleSubmit}
-            disabled={loading}
-          />
+            <GradientButton
+              title={isLogin ? 'Recevoir le code' : "S'inscrire par telephone"}
+              onPress={handleSendOtp}
+            />
+          </View>
+        )}
 
-          {!isLogin && (
-            <Text style={styles.bonus}>Bonus : 5 000F offerts a l'inscription !</Text>
-          )}
-
-          <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
-            <Text style={styles.switchText}>
-              {isLogin ? "Pas de compte ? S'inscrire" : 'Deja un compte ? Se connecter'}
+        {/* STEP: OTP */}
+        {step === 'otp' && (
+          <View style={styles.form}>
+            <Text style={styles.otpTitle}>
+              Code envoye au {fullPhone}
             </Text>
-          </TouchableOpacity>
-        </View>
+
+            {testCode ? (
+              <View style={styles.testCodeBox}>
+                <Text style={styles.testCodeLabel}>Mode test - Code :</Text>
+                <Text style={styles.testCodeValue}>{testCode}</Text>
+              </View>
+            ) : null}
+
+            <TextInput
+              style={[styles.input, styles.otpInput]}
+              placeholder="000000"
+              placeholderTextColor={COLORS.textSecondary}
+              value={otpCode}
+              onChangeText={(t) => setOtpCode(t.replace(/[^0-9]/g, '').slice(0, 6))}
+              keyboardType="number-pad"
+              maxLength={6}
+              textContentType="oneTimeCode"
+            />
+
+            <GradientButton
+              title="Verifier"
+              onPress={handleVerifyOtp}
+              disabled={otpCode.length !== 6}
+            />
+
+            <TouchableOpacity onPress={handleResendOtp} disabled={resendTimer > 0}>
+              <Text style={[styles.switchText, resendTimer > 0 && styles.textDisabled]}>
+                {resendTimer > 0
+                  ? `Renvoyer le code dans ${resendTimer}s`
+                  : 'Renvoyer le code'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => { setStep('phone'); setOtpCode(''); setTestCode(''); }}>
+              <Text style={styles.switchText}>Changer de numero</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* STEP: PROFILE (new user - both Google and phone) */}
+        {step === 'profile' && (
+          <View style={styles.form}>
+            <Text style={styles.otpTitle}>Completez votre profil</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Pseudo"
+              placeholderTextColor={COLORS.textSecondary}
+              value={displayName}
+              onChangeText={setDisplayName}
+              autoCapitalize="none"
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Email (optionnel)"
+              placeholderTextColor={COLORS.textSecondary}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Code parrain (optionnel)"
+              placeholderTextColor={COLORS.textSecondary}
+              value={referralCode}
+              onChangeText={handleReferralCodeChange}
+              autoCapitalize="characters"
+              maxLength={10}
+            />
+            {referralCode.length > 0 && (
+              <Text style={[
+                styles.referralFeedback,
+                referralChecking ? styles.referralChecking :
+                referralValid === true ? styles.referralValid :
+                referralValid === false ? styles.referralInvalid : null,
+              ]}>
+                {referralChecking ? 'Verification...' :
+                 referralValid === true ? `Parraine par ${referrerName}` :
+                 referralValid === false ? 'Code invalide' :
+                 'Entrez les 10 caracteres (ex: PPC-A7X3K9)'}
+              </Text>
+            )}
+
+            <GradientButton
+              title="Commencer"
+              onPress={handleCreateProfile}
+            />
+          </View>
+        )}
 
         <Text style={styles.poweredBy}>POWERED BY LEXOVA</Text>
       </ScrollView>
@@ -278,12 +537,110 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  bonus: {
-    color: COLORS.gold,
-    fontSize: FONTS.regular,
+  otpInput: {
+    textAlign: 'center',
+    fontSize: FONTS.xlarge,
+    fontFamily: FONT_FAMILY.bold,
+    letterSpacing: 8,
+  },
+  otpTitle: {
+    color: COLORS.text,
+    fontSize: FONTS.medium,
     fontFamily: FONT_FAMILY.medium,
     textAlign: 'center',
+    marginBottom: SPACING.sm,
+  },
+  testCodeBox: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.warning,
+    alignItems: 'center',
+  },
+  testCodeLabel: {
+    color: COLORS.warning,
+    fontSize: 13,
+    fontFamily: FONT_FAMILY.regular,
+  },
+  testCodeValue: {
+    color: COLORS.warning,
+    fontSize: FONTS.large,
+    fontFamily: FONT_FAMILY.bold,
     fontWeight: 'bold',
+    letterSpacing: 6,
+    marginTop: SPACING.xs,
+  },
+  modeTabs: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 4,
+  },
+  modeTab: {
+    flex: 1,
+    paddingVertical: SPACING.sm,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  modeTabActive: {
+    backgroundColor: COLORS.primary,
+  },
+  modeTabText: {
+    color: COLORS.textSecondary,
+    fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.medium,
+  },
+  modeTabTextActive: {
+    color: COLORS.text,
+    fontWeight: 'bold',
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  googleButtonText: {
+    color: COLORS.text,
+    fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.medium,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: COLORS.border,
+  },
+  dividerText: {
+    color: COLORS.textSecondary,
+    fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
+  },
+  referralFeedback: {
+    fontSize: 13,
+    fontFamily: FONT_FAMILY.regular,
+    marginTop: -8,
+    marginLeft: 4,
+    color: COLORS.textSecondary,
+  },
+  referralChecking: {
+    color: COLORS.warning,
+  },
+  referralValid: {
+    color: COLORS.success,
+  },
+  referralInvalid: {
+    color: COLORS.danger,
   },
   switchText: {
     color: COLORS.primary,
@@ -291,6 +648,9 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILY.regular,
     textAlign: 'center',
     marginTop: SPACING.sm,
+  },
+  textDisabled: {
+    color: COLORS.textSecondary,
   },
   poweredBy: {
     color: COLORS.textSecondary,

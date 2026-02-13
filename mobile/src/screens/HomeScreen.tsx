@@ -2,15 +2,19 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { signOut } from 'firebase/auth';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../config/firebase';
 import { cancelActiveGames } from '../config/api';
 import { COLORS, FONTS, SPACING, FONT_FAMILY } from '../config/theme';
 import { showAlert } from '../utils/alert';
+import { RootStackParamList } from '../types';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
 
 export default function HomeScreen() {
   const { userData, firebaseUser } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const cleanupDone = useRef(false);
 
   // On mount, cancel any orphaned active games (e.g. after page reload)
@@ -46,25 +50,20 @@ export default function HomeScreen() {
       ? Math.round((userData.stats.wins / userData.stats.gamesPlayed) * 100)
       : 0;
 
-  const initial = userData.displayName ? userData.displayName.charAt(0).toUpperCase() : '?';
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.profileRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initial}</Text>
-          </View>
+          <Image
+            source={require('../../assets/P2C_Icon_Only.png')}
+            style={styles.headerLogo}
+            resizeMode="contain"
+          />
           <View style={styles.nameContainer}>
             <Text style={styles.welcomeLabel}>Salut,</Text>
             <Text style={styles.welcomeName}>{userData.displayName} !</Text>
           </View>
         </View>
-        <Image
-          source={require('../../assets/P2C_Icon_Only.png')}
-          style={styles.headerLogo}
-          resizeMode="contain"
-        />
         <TouchableOpacity onPress={() => signOut(auth)} style={styles.logoutButton}>
           <Ionicons name="log-out-outline" size={24} color={COLORS.danger} />
         </TouchableOpacity>
@@ -104,6 +103,25 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      <TouchableOpacity
+        style={styles.referralButton}
+        onPress={() => navigation.navigate('Referral')}
+      >
+        <View style={styles.referralLeft}>
+          <Ionicons name="people" size={24} color={COLORS.pix} />
+          <View>
+            <Text style={styles.referralTitle}>Inviter des amis</Text>
+            <Text style={styles.referralSub}>
+              {userData.referralStats?.referralsCount || 0} filleul{(userData.referralStats?.referralsCount || 0) !== 1 ? 's' : ''}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.referralRight}>
+          <Text style={styles.referralPix}>+{userData.referralStats?.pixEarned || 0} PIX</Text>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+        </View>
+      </TouchableOpacity>
+
       <Navbar active="Home" />
     </View>
   );
@@ -128,20 +146,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+  headerLogo: {
+    width: 44,
+    height: 44,
     marginRight: SPACING.sm,
-  },
-  avatarText: {
-    color: COLORS.text,
-    fontSize: FONTS.large,
-    fontWeight: 'bold',
-    fontFamily: FONT_FAMILY.bold,
   },
   nameContainer: {
     flex: 1,
@@ -156,11 +164,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.text,
     fontFamily: FONT_FAMILY.bold,
-  },
-  headerLogo: {
-    width: 36,
-    height: 36,
-    marginRight: SPACING.sm,
   },
   logoutButton: {
     padding: SPACING.sm,
@@ -229,5 +232,42 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 4,
     fontFamily: FONT_FAMILY.regular,
+  },
+  referralButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  referralLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  referralTitle: {
+    color: COLORS.text,
+    fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.medium,
+    fontWeight: '600',
+  },
+  referralSub: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    fontFamily: FONT_FAMILY.regular,
+  },
+  referralRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  referralPix: {
+    color: COLORS.pix,
+    fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.bold,
+    fontWeight: 'bold',
   },
 });

@@ -23,14 +23,17 @@
         "backgroundColor": "#111118"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
       "favicon": "./assets/P2C_Icon_App.png"
     },
     "owner": "lexova",
+    "scheme": "ppc-game",
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

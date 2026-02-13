@@ -35,37 +35,28 @@ interface PaymentRecord {
 
 const payments = new Map<string, PaymentRecord>();
 
-// ─── Firestore helpers (only in production with credentials) ───────────────
+// ─── Firestore helpers ───────────────────────────────────────────────────────
 
-const hasFirebaseCredentials = !!process.env.FIREBASE_SERVICE_ACCOUNT;
+import { rechargeBalance } from '../services/transactionService';
 
 async function saveToFirestore(reference: string, data: any) {
-  if (!hasFirebaseCredentials) return;
   try {
-    const { db } = await import('../config/firebase');
     await db.collection('genius_payments').doc(reference).set(data);
-  } catch {
-    // Firestore unavailable - skip silently
+  } catch (err) {
+    console.error('[GeniusPay] saveToFirestore error:', err);
   }
 }
 
 async function updateFirestore(reference: string, data: any) {
-  if (!hasFirebaseCredentials) return;
   try {
-    const { db } = await import('../config/firebase');
     await db.collection('genius_payments').doc(reference).update(data);
-  } catch {
-    // Firestore unavailable - skip silently
+  } catch (err) {
+    console.error('[GeniusPay] updateFirestore error:', err);
   }
 }
 
 async function rechargeUserBalance(userId: string, amount: number) {
-  if (hasFirebaseCredentials) {
-    const { rechargeBalance } = await import('../services/transactionService');
-    return await rechargeBalance(userId, amount);
-  }
-  // No Firebase: return simulated result
-  return { newBalance: amount, netAmount: amount, fee: 0 };
+  return await rechargeBalance(userId, amount);
 }
 
 // ─── POST /api/genius-pay/initiate ─────────────────────────────────────────
@@ -248,21 +239,25 @@ router.post('/webhook', async (req: Request, res: Response) => {
       return;
     }
 
-    const signature = req.headers['x-genius-signature'] as string;
+    const signature = req.headers['x-webhook-signature'] as string;
+    const timestamp = req.headers['x-webhook-timestamp'] as string;
     const rawBody = JSON.stringify(req.body);
     const config = getGeniusPayConfig();
 
     if (signature && config.webhookSecret) {
-      const isValid = verifyWebhookSignature(rawBody, signature, config.webhookSecret);
+      const isValid = verifyWebhookSignature(rawBody, signature, config.webhookSecret, timestamp);
       if (!isValid) {
+        console.warn('[GeniusPay] Webhook: Invalid signature');
         res.status(400).json({ error: 'Invalid signature.' });
         return;
       }
     }
 
     const { event, data } = req.body;
+    console.log(`[GeniusPay] Webhook event: ${event}, ref: ${data?.reference}`);
 
-    if (event === 'payment.completed' && data?.reference) {
+    // Real API sends "payment.success", also handle legacy "payment.completed"
+    if ((event === 'payment.success' || event === 'payment.completed') && data?.reference) {
       const record = payments.get(data.reference);
       if (record && record.status !== 'completed') {
         record.status = 'completed';

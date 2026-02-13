@@ -24,10 +24,19 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Withdraw'>;
 };
 
+type WithdrawMethod = 'wave' | 'orange_money' | 'mtn_money';
+
+const WITHDRAW_METHODS: { key: WithdrawMethod; label: string; icon: keyof typeof Ionicons.glyphMap; color: string; desc: string }[] = [
+  { key: 'wave', label: 'Wave', icon: 'phone-portrait-outline', color: '#1DC3F0', desc: 'Transfert sur Wave' },
+  { key: 'orange_money', label: 'Orange Money', icon: 'phone-portrait-outline', color: '#FF6600', desc: 'Transfert sur Orange Money' },
+  { key: 'mtn_money', label: 'MTN Money', icon: 'phone-portrait-outline', color: '#FFCC00', desc: 'Transfert sur MTN Money' },
+];
+
 export default function WithdrawScreen({ navigation }: Props) {
   const { userData } = useAuth();
   const [amount, setAmount] = useState('');
   const [phone, setPhone] = useState('');
+  const [method, setMethod] = useState<WithdrawMethod>('wave');
   const [country, setCountry] = useState<Country>(DEFAULT_COUNTRY);
   const [countryPickerVisible, setCountryPickerVisible] = useState(false);
   const [feePercent, setFeePercent] = useState<number | null>(null);
@@ -38,13 +47,14 @@ export default function WithdrawScreen({ navigation }: Props) {
   const fee = feePercent !== null ? Math.round((numAmount * feePercent) / 100) : 0;
   const netAmount = numAmount - fee;
 
-  // Fetch withdrawal fee on mount
   useEffect(() => {
     getWithdrawalFee()
       .then((data) => setFeePercent(data.percent))
-      .catch(() => setFeePercent(5)) // fallback
+      .catch(() => setFeePercent(5))
       .finally(() => setLoadingFee(false));
   }, []);
+
+  const selectedMethod = WITHDRAW_METHODS.find((m) => m.key === method)!;
 
   const handleWithdraw = () => {
     if (!userData) return;
@@ -67,7 +77,7 @@ export default function WithdrawScreen({ navigation }: Props) {
 
     showAlert(
       'Confirmer le retrait',
-      `Retirer ${numAmount.toLocaleString()}F ?\nVous recevrez ${netAmount.toLocaleString()}F (frais ${fee.toLocaleString()}F)`,
+      `Retirer ${numAmount.toLocaleString()}F via ${selectedMethod.label} ?\nVous recevrez ${netAmount.toLocaleString()}F (frais ${fee.toLocaleString()}F)`,
       [
         { text: 'Annuler' },
         { text: 'Confirmer', onPress: () => processWithdraw() },
@@ -79,13 +89,13 @@ export default function WithdrawScreen({ navigation }: Props) {
     setLoading(true);
     const fullPhone = country.dialCode + phone;
     try {
-      const result = await withdrawFunds(numAmount, 'Orange', fullPhone);
+      const result = await withdrawFunds(numAmount, method, fullPhone);
 
       let title: string;
       let message: string;
       if (result.payoutStatus === 'processing') {
         title = 'Retrait en cours';
-        message = `Vous recevrez ${result.netAmount.toLocaleString()}F sur ${fullPhone}.\nFrais: ${result.fee.toLocaleString()}F`;
+        message = `Vous recevrez ${result.netAmount.toLocaleString()}F sur ${selectedMethod.label} (${fullPhone}).\nFrais: ${result.fee.toLocaleString()}F`;
       } else {
         title = 'Retrait enregistre';
         message = `Retrait de ${result.netAmount.toLocaleString()}F enregistre. Transfert traite sous peu.\nFrais: ${result.fee.toLocaleString()}F`;
@@ -122,6 +132,28 @@ export default function WithdrawScreen({ navigation }: Props) {
         <Text style={styles.balanceValue}>{userData?.balance.toLocaleString()}F</Text>
       </View>
 
+      {/* Method Selection */}
+      <Text style={styles.label}>Methode de reception</Text>
+      <View style={styles.methodRow}>
+        {WITHDRAW_METHODS.map((m) => (
+          <TouchableOpacity
+            key={m.key}
+            style={[styles.methodCard, method === m.key && { borderColor: m.color }]}
+            onPress={() => setMethod(m.key)}
+          >
+            <View style={[styles.methodIcon, { backgroundColor: m.color + '20' }]}>
+              <Ionicons name={m.icon} size={22} color={m.color} />
+            </View>
+            <Text style={[styles.methodLabel, method === m.key && { color: m.color }]}>
+              {m.label}
+            </Text>
+            {method === m.key && (
+              <Ionicons name="checkmark-circle" size={18} color={m.color} style={styles.methodCheck} />
+            )}
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <Text style={styles.label}>Montant du retrait</Text>
       <TextInput
         style={styles.input}
@@ -133,7 +165,7 @@ export default function WithdrawScreen({ navigation }: Props) {
       />
       <Text style={styles.minText}>Minimum : 1 000F</Text>
 
-      <Text style={styles.label}>Numero de telephone</Text>
+      <Text style={styles.label}>Numero {selectedMethod.label}</Text>
       <View style={styles.phoneRow}>
         <TouchableOpacity
           style={styles.countrySelector}
@@ -164,6 +196,12 @@ export default function WithdrawScreen({ navigation }: Props) {
             -{fee.toLocaleString()}F
           </Text>
         </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Via</Text>
+          <Text style={[styles.summaryValue, { color: selectedMethod.color }]}>
+            {selectedMethod.label}
+          </Text>
+        </View>
         <View style={[styles.summaryRow, styles.summaryTotal]}>
           <Text style={[styles.summaryLabel, { fontWeight: 'bold' }]}>Vous recevrez</Text>
           <Text style={[styles.summaryValue, { color: COLORS.success, fontWeight: 'bold' }]}>
@@ -175,14 +213,15 @@ export default function WithdrawScreen({ navigation }: Props) {
       <TouchableOpacity
         style={[
           styles.button,
+          { backgroundColor: selectedMethod.color },
           (loading || !numAmount || !phone) && styles.buttonDisabled,
         ]}
         onPress={handleWithdraw}
         disabled={loading || !numAmount || !phone}
       >
-        <Ionicons name="cash-outline" size={20} color={COLORS.text} />
+        <Ionicons name="cash-outline" size={20} color="#fff" />
         <Text style={styles.buttonText}>
-          {loading ? 'Traitement...' : 'Retirer'}
+          {loading ? 'Traitement...' : `Retirer via ${selectedMethod.label}`}
         </Text>
       </TouchableOpacity>
     </ScrollView>
@@ -285,6 +324,42 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     fontFamily: FONT_FAMILY.regular,
   },
+  // Method selection
+  methodRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.lg,
+  },
+  methodCard: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: SPACING.sm,
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+  },
+  methodIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  methodLabel: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontFamily: FONT_FAMILY.medium,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  methodCheck: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+  },
+  // Input
   input: {
     backgroundColor: COLORS.surface,
     borderRadius: 12,
@@ -366,7 +441,6 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILY.regular,
   },
   button: {
-    backgroundColor: COLORS.primary,
     borderRadius: 12,
     padding: SPACING.md,
     alignItems: 'center',
@@ -378,7 +452,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   buttonText: {
-    color: COLORS.text,
+    color: '#fff',
     fontSize: FONTS.medium,
     fontWeight: 'bold',
     fontFamily: FONT_FAMILY.bold,

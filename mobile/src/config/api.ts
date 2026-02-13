@@ -65,9 +65,28 @@ async function apiPost(endpoint: string, body?: any) {
   return data;
 }
 
-// Auth
-export function registerProfile(displayName: string) {
-  return apiPost('/auth/register', { displayName });
+// Auth - public (no Bearer token)
+async function apiPostPublic(endpoint: string, body?: Record<string, unknown>) {
+  const res = await safeFetch(`${API_BASE}${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await parseJSON(res);
+  if (!res.ok) throw new Error(data.error || 'Erreur serveur');
+  return data;
+}
+
+export function sendOtp(phone: string, isRegistration: boolean) {
+  return apiPostPublic('/auth/send-otp', { phone, isRegistration });
+}
+
+export function verifyOtp(phone: string, otp: string) {
+  return apiPostPublic('/auth/verify-otp', { phone, otp });
+}
+
+export function registerProfile(displayName: string, email?: string, referralCode?: string) {
+  return apiPost('/auth/register', { displayName, email, referralCode });
 }
 
 export function getMe() {
@@ -77,6 +96,10 @@ export function getMe() {
 // Transactions
 export function rechargeBalance(amount: number) {
   return apiPost('/transactions/recharge', { amount });
+}
+
+export function getTransactionHistory() {
+  return apiGet('/transactions/history');
 }
 
 // Matchmaking
@@ -129,4 +152,24 @@ export function completeGeniusDemoPayment(reference: string) {
 
 export function getGeniusPayInfo() {
   return apiGet('/genius-pay/status-info');
+}
+
+// Referral (validate does not require auth - used before registration)
+export async function validateReferralCode(code: string) {
+  const res = await safeFetch(`${API_BASE}/referral/validate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  });
+  const data = await parseJSON(res);
+  if (!res.ok) throw new Error(data.error || 'Erreur serveur');
+  return data;
+}
+
+export function getMyReferralCode() {
+  return apiGet('/referral/my-code');
+}
+
+export function getReferralStats() {
+  return apiGet('/referral/stats');
 }

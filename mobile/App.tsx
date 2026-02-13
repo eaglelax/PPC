@@ -16,6 +16,8 @@ import GameScreen from './src/screens/GameScreen';
 import ResultScreen from './src/screens/ResultScreen';
 import RechargeScreen from './src/screens/RechargeScreen';
 import WithdrawScreen from './src/screens/WithdrawScreen';
+import ReferralScreen from './src/screens/ReferralScreen';
+import HistoryScreen from './src/screens/HistoryScreen';
 import { RootStackParamList } from './src/types';
 import { COLORS } from './src/config/theme';
 
@@ -76,11 +78,14 @@ const crashStyles = RNStyleSheet.create({
 });
 
 function AppNavigator() {
-  const { firebaseUser, loading } = useAuth();
+  const { firebaseUser, userData, loading, needsProfile } = useAuth();
 
   if (loading) {
     return <LoadingScreen />;
   }
+
+  // Show Auth screen if: no firebase user, OR firebase user but no profile yet
+  const showAuth = !firebaseUser || needsProfile;
 
   return (
     <Stack.Navigator
@@ -90,7 +95,7 @@ function AppNavigator() {
         animation: 'slide_from_right',
       }}
     >
-      {firebaseUser ? (
+      {!showAuth && userData ? (
         <>
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="Bet" component={BetScreen} />
@@ -111,6 +116,8 @@ function AppNavigator() {
           />
           <Stack.Screen name="Recharge" component={RechargeScreen} />
           <Stack.Screen name="Withdraw" component={WithdrawScreen} />
+          <Stack.Screen name="Referral" component={ReferralScreen} />
+          <Stack.Screen name="History" component={HistoryScreen} />
         </>
       ) : (
         <Stack.Screen name="Auth" component={AuthScreen} />
