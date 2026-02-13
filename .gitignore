@@ -62,4 +62,5 @@ mobile/credentials.json
 ppc-game-8b35f-firebase-adminsdk-*.json
 
 # Build artifacts
+build/
 ppcgame.app/
