@@ -165,15 +165,20 @@ export default function AuthScreen() {
 
     setLoading(true);
     try {
-      if (isLogin) {
-        await signInWithEmailAndPassword(auth, authEmail.trim(), authPassword);
-      } else {
-        await createUserWithEmailAndPassword(auth, authEmail.trim(), authPassword);
-      }
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 15000)
+      );
+      const authPromise = isLogin
+        ? signInWithEmailAndPassword(auth, authEmail.trim(), authPassword)
+        : createUserWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+
+      await Promise.race([authPromise, timeout]);
     } catch (error: unknown) {
       const err = error as any;
       let message = 'Une erreur est survenue.';
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+      if (err.message === 'timeout') {
+        message = 'Connexion trop lente. Verifiez votre connexion internet.';
+      } else if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
         message = 'Email ou mot de passe incorrect.';
       } else if (err.code === 'auth/email-already-in-use') {
         message = 'Cet email est deja utilise. Essayez de vous connecter.';
@@ -181,6 +186,8 @@ export default function AuthScreen() {
         message = 'Email invalide.';
       } else if (err.code === 'auth/weak-password') {
         message = 'Mot de passe trop faible (min 6 caracteres).';
+      } else if (err.code === 'auth/network-request-failed') {
+        message = 'Erreur reseau. Verifiez votre connexion internet.';
       }
       showAlert('Erreur', message);
     } finally {
