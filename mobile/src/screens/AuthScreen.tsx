@@ -16,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   signInWithCustomToken,
   signInWithCredential,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
 } from 'firebase/auth';
@@ -33,7 +35,7 @@ import LoadingScreen from '../components/LoadingScreen';
 
 WebBrowser.maybeCompleteAuthSession();
 
-type Step = 'phone' | 'otp' | 'profile';
+type Step = 'phone' | 'otp' | 'profile' | 'email';
 
 export default function AuthScreen() {
   const { needsProfile, firebaseUser } = useAuth();
@@ -51,6 +53,10 @@ export default function AuthScreen() {
   const [otpCode, setOtpCode] = useState('');
   const [testCode, setTestCode] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
+
+  // Email/password step
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
 
   // Profile step
   const [displayName, setDisplayName] = useState('');
@@ -141,6 +147,41 @@ export default function AuthScreen() {
       setResendTimer(60);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Une erreur est survenue.';
+      showAlert('Erreur', message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmailAuth = async () => {
+    if (!authEmail.trim() || !authPassword.trim()) {
+      showAlert('Erreur', 'Email et mot de passe requis.');
+      return;
+    }
+    if (authPassword.length < 6) {
+      showAlert('Erreur', 'Le mot de passe doit contenir au moins 6 caracteres.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (isLogin) {
+        await signInWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+      } else {
+        await createUserWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+      }
+    } catch (error: unknown) {
+      const err = error as any;
+      let message = 'Une erreur est survenue.';
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+        message = 'Email ou mot de passe incorrect.';
+      } else if (err.code === 'auth/email-already-in-use') {
+        message = 'Cet email est deja utilise. Essayez de vous connecter.';
+      } else if (err.code === 'auth/invalid-email') {
+        message = 'Email invalide.';
+      } else if (err.code === 'auth/weak-password') {
+        message = 'Mot de passe trop faible (min 6 caracteres).';
+      }
       showAlert('Erreur', message);
     } finally {
       setLoading(false);
@@ -243,6 +284,7 @@ export default function AuthScreen() {
       phone: 'Envoi du code...',
       otp: 'Verification...',
       profile: 'Creation du compte...',
+      email: 'Connexion...',
     };
     return <LoadingScreen message={messages[step]} />;
   }
@@ -325,6 +367,61 @@ export default function AuthScreen() {
               title={isLogin ? 'Recevoir le code' : "S'inscrire par telephone"}
               onPress={handleSendOtp}
             />
+
+            {/* Switch to email auth */}
+            <TouchableOpacity onPress={() => setStep('email')}>
+              <Text style={styles.switchText}>Utiliser email / mot de passe</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* STEP: EMAIL */}
+        {step === 'email' && (
+          <View style={styles.form}>
+            {/* Mode toggle tabs */}
+            <View style={styles.modeTabs}>
+              <TouchableOpacity
+                style={[styles.modeTab, isLogin && styles.modeTabActive]}
+                onPress={() => setIsLogin(true)}
+              >
+                <Text style={[styles.modeTabText, isLogin && styles.modeTabTextActive]}>Connexion</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modeTab, !isLogin && styles.modeTabActive]}
+                onPress={() => setIsLogin(false)}
+              >
+                <Text style={[styles.modeTabText, !isLogin && styles.modeTabTextActive]}>Inscription</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={COLORS.textSecondary}
+              value={authEmail}
+              onChangeText={setAuthEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Mot de passe"
+              placeholderTextColor={COLORS.textSecondary}
+              value={authPassword}
+              onChangeText={setAuthPassword}
+              secureTextEntry
+            />
+
+            <GradientButton
+              title={isLogin ? 'Se connecter' : "S'inscrire"}
+              onPress={handleEmailAuth}
+            />
+
+            {/* Switch to phone auth */}
+            <TouchableOpacity onPress={() => setStep('phone')}>
+              <Text style={styles.switchText}>Utiliser telephone / Google</Text>
+            </TouchableOpacity>
           </View>
         )}
 
