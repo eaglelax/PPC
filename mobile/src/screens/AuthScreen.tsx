@@ -35,7 +35,7 @@ import LoadingScreen from '../components/LoadingScreen';
 
 WebBrowser.maybeCompleteAuthSession();
 
-type Step = 'phone' | 'otp' | 'profile' | 'email';
+type Step = 'phone' | 'phoneInput' | 'otp' | 'profile';
 
 export default function AuthScreen() {
   const { needsProfile, firebaseUser } = useAuth();
@@ -281,10 +281,10 @@ export default function AuthScreen() {
 
   if (loading) {
     const messages: Record<Step, string> = {
-      phone: 'Envoi du code...',
+      phone: 'Connexion...',
+      phoneInput: 'Envoi du code...',
       otp: 'Verification...',
       profile: 'Creation du compte...',
-      email: 'Connexion...',
     };
     return <LoadingScreen message={messages[step]} />;
   }
@@ -328,6 +328,38 @@ export default function AuthScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* Email / Password */}
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={COLORS.textSecondary}
+              value={authEmail}
+              onChangeText={setAuthEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Mot de passe"
+              placeholderTextColor={COLORS.textSecondary}
+              value={authPassword}
+              onChangeText={setAuthPassword}
+              secureTextEntry
+            />
+
+            <GradientButton
+              title={isLogin ? 'Se connecter' : "S'inscrire"}
+              onPress={handleEmailAuth}
+            />
+
+            {/* Divider */}
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>ou</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
             {/* Google Sign-In */}
             <TouchableOpacity style={styles.googleButton} onPress={handleGoogleSignIn}>
               <Ionicons name="logo-google" size={20} color={COLORS.text} />
@@ -336,11 +368,30 @@ export default function AuthScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* Divider */}
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>ou par telephone</Text>
-              <View style={styles.dividerLine} />
+            {/* Switch to phone auth */}
+            <TouchableOpacity onPress={() => setStep('phoneInput')}>
+              <Text style={styles.switchText}>Utiliser un numero de telephone</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* STEP: PHONE INPUT */}
+        {step === 'phoneInput' && (
+          <View style={styles.form}>
+            {/* Mode toggle tabs */}
+            <View style={styles.modeTabs}>
+              <TouchableOpacity
+                style={[styles.modeTab, isLogin && styles.modeTabActive]}
+                onPress={() => setIsLogin(true)}
+              >
+                <Text style={[styles.modeTabText, isLogin && styles.modeTabTextActive]}>Connexion</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modeTab, !isLogin && styles.modeTabActive]}
+                onPress={() => setIsLogin(false)}
+              >
+                <Text style={[styles.modeTabText, !isLogin && styles.modeTabTextActive]}>Inscription</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Phone input */}
@@ -368,59 +419,8 @@ export default function AuthScreen() {
               onPress={handleSendOtp}
             />
 
-            {/* Switch to email auth */}
-            <TouchableOpacity onPress={() => setStep('email')}>
-              <Text style={styles.switchText}>Utiliser email / mot de passe</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* STEP: EMAIL */}
-        {step === 'email' && (
-          <View style={styles.form}>
-            {/* Mode toggle tabs */}
-            <View style={styles.modeTabs}>
-              <TouchableOpacity
-                style={[styles.modeTab, isLogin && styles.modeTabActive]}
-                onPress={() => setIsLogin(true)}
-              >
-                <Text style={[styles.modeTabText, isLogin && styles.modeTabTextActive]}>Connexion</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modeTab, !isLogin && styles.modeTabActive]}
-                onPress={() => setIsLogin(false)}
-              >
-                <Text style={[styles.modeTabText, !isLogin && styles.modeTabTextActive]}>Inscription</Text>
-              </TouchableOpacity>
-            </View>
-
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor={COLORS.textSecondary}
-              value={authEmail}
-              onChangeText={setAuthEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder="Mot de passe"
-              placeholderTextColor={COLORS.textSecondary}
-              value={authPassword}
-              onChangeText={setAuthPassword}
-              secureTextEntry
-            />
-
-            <GradientButton
-              title={isLogin ? 'Se connecter' : "S'inscrire"}
-              onPress={handleEmailAuth}
-            />
-
-            {/* Switch to phone auth */}
             <TouchableOpacity onPress={() => setStep('phone')}>
-              <Text style={styles.switchText}>Utiliser telephone / Google</Text>
+              <Text style={styles.switchText}>Retour a email / mot de passe</Text>
             </TouchableOpacity>
           </View>
         )}
