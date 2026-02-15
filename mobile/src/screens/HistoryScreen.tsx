@@ -51,14 +51,18 @@ export default function HistoryScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
 
   const fetchHistory = async () => {
     try {
+      setError(null);
       const data = await getTransactionHistory();
       setTransactions(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (err: unknown) {
       setTransactions([]);
+      const message = err instanceof Error ? err.message : 'Erreur inconnue';
+      setError(message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -124,7 +128,16 @@ export default function HistoryScreen() {
         ))}
       </ScrollView>
 
-      {filteredTransactions.length === 0 ? (
+      {error ? (
+        <View style={styles.empty}>
+          <Ionicons name="cloud-offline-outline" size={64} color={COLORS.danger} />
+          <Text style={styles.emptyText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => { setLoading(true); fetchHistory(); }}>
+            <Ionicons name="refresh" size={20} color={COLORS.text} />
+            <Text style={styles.retryText}>Reessayer</Text>
+          </TouchableOpacity>
+        </View>
+      ) : filteredTransactions.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="receipt-outline" size={64} color={COLORS.textSecondary} />
           <Text style={styles.emptyText}>Aucune transaction</Text>
@@ -244,5 +257,23 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: FONTS.regular,
     fontFamily: FONT_FAMILY.regular,
+    textAlign: 'center',
+    paddingHorizontal: SPACING.lg,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    marginTop: SPACING.sm,
+  },
+  retryText: {
+    color: COLORS.text,
+    fontSize: FONTS.regular,
+    fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.semibold,
   },
 });

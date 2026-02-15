@@ -74,7 +74,16 @@ export default function PrivacyPolicyScreen({ navigation, route }: Props) {
           Vos donnees sont conservees pendant toute la duree de vie de votre compte, puis pendant une periode de 5 ans apres la cloture de celui-ci, conformement aux obligations legales.
         </Text>
 
-        <Text style={styles.sectionTitle}>7. Contact</Text>
+        <Text style={styles.sectionTitle}>7. Conditions de jeu et frais</Text>
+        <Text style={styles.text}>
+          Lors de chaque partie, des frais de lancement de 10 FCFA par joueur sont preleves.{'\n\n'}
+          En cas d'annulation d'une partie en cours (par vous ou votre adversaire) :{'\n'}
+          - Votre mise vous sera integralement restituee{'\n'}
+          - Les frais de lancement (10 FCFA) ne sont pas remboursables{'\n\n'}
+          Ces frais couvrent les couts d'infrastructure et de traitement des parties.
+        </Text>
+
+        <Text style={styles.sectionTitle}>8. Contact</Text>
         <Text style={styles.text}>
           Pour toute question relative a la protection de vos donnees, vous pouvez nous contacter par email a l'adresse :{'\n\n'}
           support@p2c-game.com

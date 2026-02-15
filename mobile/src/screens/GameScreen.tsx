@@ -518,7 +518,8 @@ export default function GameScreen({ navigation, route }: Props) {
             <Text style={styles.modalTitle}>Adversaire deconnecte</Text>
             <Text style={styles.modalText}>
               Votre adversaire a quitte la partie.{'\n'}
-              Votre mise sera remboursee.
+              Votre mise sera remboursee.{'\n'}
+              Les frais de lancement (10F) ne sont pas rembourses.
             </Text>
             <TouchableOpacity
               style={[styles.modalButtonPrimary, disconnectCountdown > 0 && { opacity: 0.5 }]}
