@@ -39,6 +39,7 @@ export interface Game {
   timeoutCount: number;
   choosingStartedAt: Date;
   createdAt: Date;
+  cancelledBy?: string;
 }
 
 export interface PlayerState {
@@ -86,7 +87,7 @@ export interface ReferralInfo {
 }
 
 export type RootStackParamList = {
-  Auth: undefined;
+  Auth: { privacyAccepted?: boolean } | undefined;
   Home: undefined;
   Bet: undefined;
   Waiting: { betId: string; betAmount: number };
@@ -96,4 +97,5 @@ export type RootStackParamList = {
   Withdraw: undefined;
   Referral: undefined;
   History: undefined;
+  PrivacyPolicy: { fromSignup?: boolean };
 };

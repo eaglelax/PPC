@@ -132,6 +132,10 @@ export function cancelActiveGames() {
   return apiPost('/games/cancel-active');
 }
 
+export function cancelGame(gameId: string) {
+  return apiPost(`/games/${gameId}/cancel`);
+}
+
 // Orange Money
 export function payWithOrangeMoney(amount: number, phone: string, otp: string) {
   return apiPost('/orange-money/pay', { amount, phone, otp });

@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, AppState, Platform, ActivityIndicator } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, AppState, Platform, ActivityIndicator, Modal, BackHandler } from 'react-native';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp } from '@react-navigation/native';
+import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../contexts/AuthContext';
 import { onGameUpdate } from '../services/gameService';
-import { submitChoice, submitTimeout, cancelStaleGame, API_BASE } from '../config/api';
+import { submitChoice, submitTimeout, cancelStaleGame, cancelGame, API_BASE } from '../config/api';
 import { auth } from '../config/firebase';
 import { COLORS, FONTS, SPACING, FONT_FAMILY, GRADIENT_COLORS, CHOICE_TIMER } from '../config/theme';
 import { RootStackParamList, Choice, Game } from '../types';
@@ -51,6 +51,15 @@ export default function GameScreen({ navigation, route }: Props) {
   const showDrawRef = useRef(false);
   const scaleAnims = useRef(CHOICES.map(() => new Animated.Value(1))).current;
 
+  // Cancel modal state (Amendement 1)
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  // Opponent disconnect modal state (Amendement 5)
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+  const [disconnectCountdown, setDisconnectCountdown] = useState(15);
+  const didSelfCancelRef = useRef(false);
+
   const roundAnim = useRef(new Animated.Value(0)).current;
   const vsSlideAnim = useRef(new Animated.Value(-50)).current;
   const vsOpacityAnim = useRef(new Animated.Value(0)).current;
@@ -63,6 +72,37 @@ export default function GameScreen({ navigation, route }: Props) {
   useEffect(() => {
     showDrawRef.current = showDraw;
   }, [showDraw]);
+
+  // Amendement 2: Block hardware back button on Android
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (game?.status === 'choosing' || game?.status === 'draw') {
+          setShowCancelModal(true);
+          return true; // Block navigation
+        }
+        return false;
+      };
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [game?.status])
+  );
+
+  // Amendement 5: Disconnect countdown timer
+  useEffect(() => {
+    if (!showDisconnectModal) return;
+    setDisconnectCountdown(15);
+    const interval = setInterval(() => {
+      setDisconnectCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [showDisconnectModal]);
 
   // VS entry animation (on first load)
   useEffect(() => {
@@ -174,16 +214,26 @@ export default function GameScreen({ navigation, route }: Props) {
         navigation.replace('Result', { gameId });
       }
 
+      // Amendement 5: Handle cancelled status - differentiate self vs opponent
       if (g?.status === 'cancelled') {
-        showAlert(
-          'Partie annulee',
-          'La partie a ete annulee. Votre remboursement sera effectue dans moins de 24h.',
-          [{ text: 'OK', onPress: () => navigation.replace('Home') }]
-        );
+        if (didSelfCancelRef.current) {
+          // I cancelled - just go home
+          navigation.replace('Home');
+        } else if (g.cancelledBy && g.cancelledBy !== firebaseUser?.uid) {
+          // Opponent cancelled - show disconnect modal
+          setShowDisconnectModal(true);
+        } else {
+          // Generic cancel (stale, timeout, cleanup)
+          showAlert(
+            'Partie annulee',
+            'La partie a ete annulee. Votre mise sera remboursee.',
+            [{ text: 'OK', onPress: () => navigation.replace('Home') }]
+          );
+        }
       }
     }, (error) => {
       // Firestore connection lost
-      console.error('Game listener error:', error);
+      if (__DEV__) console.error('Game listener error:', error);
       setIsOffline(true);
       isOfflineRef.current = true;
       showAlert(
@@ -193,7 +243,7 @@ export default function GameScreen({ navigation, route }: Props) {
       );
     });
     return unsub;
-  }, [gameId, navigation, drawSlideAnim]);
+  }, [gameId, navigation, drawSlideAnim, firebaseUser?.uid]);
 
   // Detect stale game (choosing for > 2 minutes)
   useEffect(() => {
@@ -207,6 +257,23 @@ export default function GameScreen({ navigation, route }: Props) {
       cancelStaleGame(gameId).catch(() => {});
     }
   }, [game?.status, game?.choosingStartedAt, gameId]);
+
+  // Amendement 1: Handle cancel game
+  const handleCancelGame = async () => {
+    setCancelling(true);
+    try {
+      didSelfCancelRef.current = true;
+      await cancelGame(gameId);
+      setShowCancelModal(false);
+      navigation.replace('Home');
+    } catch (error: unknown) {
+      didSelfCancelRef.current = false;
+      const message = error instanceof Error ? error.message : 'Erreur lors de l\'annulation.';
+      showAlert('Erreur', message);
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const handleChoice = useCallback(async (choice: Choice) => {
     if (hasChosenRef.current || !firebaseUser) return;
@@ -249,7 +316,6 @@ export default function GameScreen({ navigation, route }: Props) {
       hasChosenRef.current = true;
       setHasChosen(true);
       if (timerRef.current) clearInterval(timerRef.current);
-      // Try stale game cancel when back online (handled by NetInfo listener)
       return;
     }
 
@@ -261,7 +327,6 @@ export default function GameScreen({ navigation, route }: Props) {
 
     submitTimeout(gameId).catch(() => {
       timeoutFailCountRef.current += 1;
-      // Only allow retry if this is the first failure and we're online
       if (timeoutFailCountRef.current < 2 && !isOfflineRef.current) {
         hasChosenRef.current = false;
         setHasChosen(false);
@@ -291,6 +356,7 @@ export default function GameScreen({ navigation, route }: Props) {
   if (!opponent) return null;
 
   const selectedChoiceData = CHOICES.find((c) => c.key === selectedChoice);
+  const canCancel = game.status === 'choosing' || game.status === 'draw';
 
   return (
     <View style={styles.container}>
@@ -388,6 +454,87 @@ export default function GameScreen({ navigation, route }: Props) {
           </View>
         </View>
       )}
+
+      {/* Amendement 1: Cancel button */}
+      {canCancel && (
+        <TouchableOpacity
+          style={styles.cancelButton}
+          onPress={() => setShowCancelModal(true)}
+        >
+          <Ionicons name="close-circle-outline" size={20} color={COLORS.danger} />
+          <Text style={styles.cancelButtonText}>Annuler la partie</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Amendement 1: Cancel confirmation modal */}
+      <Modal
+        visible={showCancelModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCancelModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Ionicons name="warning" size={48} color={COLORS.warning} style={{ alignSelf: 'center', marginBottom: SPACING.md }} />
+            <Text style={styles.modalTitle}>Annuler la partie ?</Text>
+            <Text style={styles.modalText}>
+              Les frais de lancement (10F) ne seront pas rembourses.{'\n'}
+              Seule votre mise sera restituee.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButtonSecondary}
+                onPress={() => setShowCancelModal(false)}
+                disabled={cancelling}
+              >
+                <Text style={styles.modalButtonSecondaryText}>Continuer</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButtonDanger, cancelling && { opacity: 0.5 }]}
+                onPress={handleCancelGame}
+                disabled={cancelling}
+              >
+                {cancelling ? (
+                  <ActivityIndicator size="small" color={COLORS.text} />
+                ) : (
+                  <Text style={styles.modalButtonDangerText}>Annuler la partie</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Amendement 5: Opponent disconnected modal */}
+      <Modal
+        visible={showDisconnectModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Ionicons name="sad-outline" size={48} color={COLORS.warning} style={{ alignSelf: 'center', marginBottom: SPACING.md }} />
+            <Text style={styles.modalTitle}>Adversaire deconnecte</Text>
+            <Text style={styles.modalText}>
+              Votre adversaire a quitte la partie.{'\n'}
+              Votre mise sera remboursee.
+            </Text>
+            <TouchableOpacity
+              style={[styles.modalButtonPrimary, disconnectCountdown > 0 && { opacity: 0.5 }]}
+              onPress={() => {
+                setShowDisconnectModal(false);
+                navigation.replace('Home');
+              }}
+              disabled={disconnectCountdown > 0}
+            >
+              <Text style={styles.modalButtonPrimaryText}>
+                {disconnectCountdown > 0 ? `Quitter (${disconnectCountdown}s)` : 'Quitter'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -523,5 +670,95 @@ const styles = StyleSheet.create({
     fontSize: FONTS.medium,
     color: COLORS.textSecondary,
     fontFamily: FONT_FAMILY.regular,
+  },
+  // Amendement 1: Cancel button
+  cancelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.md,
+    marginTop: SPACING.sm,
+  },
+  cancelButtonText: {
+    color: COLORS.danger,
+    fontSize: 14,
+    fontFamily: FONT_FAMILY.medium,
+  },
+  // Modals
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  modalContent: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: SPACING.xl,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  modalTitle: {
+    fontSize: FONTS.large,
+    fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.bold,
+    color: COLORS.text,
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+  },
+  modalText: {
+    fontSize: FONTS.regular,
+    fontFamily: FONT_FAMILY.regular,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: SPACING.xl,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
+  modalButtonSecondary: {
+    flex: 1,
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: 12,
+    padding: SPACING.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  modalButtonSecondaryText: {
+    color: COLORS.text,
+    fontSize: FONTS.regular,
+    fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.semibold,
+  },
+  modalButtonDanger: {
+    flex: 1,
+    backgroundColor: COLORS.danger,
+    borderRadius: 12,
+    padding: SPACING.md,
+    alignItems: 'center',
+  },
+  modalButtonDangerText: {
+    color: COLORS.text,
+    fontSize: FONTS.regular,
+    fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.semibold,
+  },
+  modalButtonPrimary: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    padding: SPACING.md,
+    alignItems: 'center',
+  },
+  modalButtonPrimaryText: {
+    color: COLORS.text,
+    fontSize: FONTS.regular,
+    fontWeight: 'bold',
+    fontFamily: FONT_FAMILY.semibold,
   },
 });

@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING, FONT_FAMILY } from '../config/theme';
 import { RootStackParamList } from '../types';
 
@@ -22,9 +23,10 @@ const TABS: { key: NavScreen; label: string; iconOutline: keyof typeof Ionicons.
 
 export default function Navbar({ active }: Props) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { height: NAVBAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom + 4 }]}>
       {TABS.map((tab) => {
         const isActive = tab.key === active;
         return (

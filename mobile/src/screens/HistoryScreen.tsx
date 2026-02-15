@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getTransactionHistory } from '../config/api';
 import { COLORS, FONTS, SPACING, FONT_FAMILY } from '../config/theme';
@@ -8,12 +8,30 @@ import LoadingScreen from '../components/LoadingScreen';
 import Navbar, { NAVBAR_HEIGHT } from '../components/Navbar';
 
 const TYPE_CONFIG: Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string; sign: string }> = {
-  recharge: { label: 'Recharge', icon: 'wallet', color: COLORS.success, sign: '+' },
   win: { label: 'Victoire', icon: 'trophy', color: COLORS.success, sign: '+' },
   loss: { label: 'Defaite', icon: 'close-circle', color: COLORS.danger, sign: '-' },
-  bet: { label: 'Mise', icon: 'game-controller', color: COLORS.warning, sign: '-' },
-  refund: { label: 'Remboursement', icon: 'refresh-circle', color: COLORS.primary, sign: '+' },
-  withdrawal: { label: 'Retrait', icon: 'cash', color: COLORS.danger, sign: '-' },
+  recharge: { label: 'Recharge', icon: 'wallet', color: '#4A90D9', sign: '+' },
+  withdrawal: { label: 'Retrait', icon: 'cash', color: COLORS.primary, sign: '-' },
+  bet: { label: 'Mise', icon: 'game-controller', color: COLORS.textSecondary, sign: '-' },
+  refund: { label: 'Remboursement', icon: 'refresh-circle', color: COLORS.pix, sign: '+' },
+};
+
+type FilterType = 'all' | 'wins' | 'losses' | 'recharges' | 'withdrawals';
+
+const FILTERS: { key: FilterType; label: string }[] = [
+  { key: 'all', label: 'Tous' },
+  { key: 'wins', label: 'Gains' },
+  { key: 'losses', label: 'Pertes' },
+  { key: 'recharges', label: 'Recharges' },
+  { key: 'withdrawals', label: 'Retraits' },
+];
+
+const FILTER_TYPES: Record<FilterType, string[]> = {
+  all: [],
+  wins: ['win'],
+  losses: ['loss'],
+  recharges: ['recharge'],
+  withdrawals: ['withdrawal'],
 };
 
 function formatDate(date: { _seconds?: number; seconds?: number } | string | Date): string {
@@ -33,6 +51,7 @@ export default function HistoryScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
 
   const fetchHistory = async () => {
     try {
@@ -55,6 +74,10 @@ export default function HistoryScreen() {
     fetchHistory();
   };
 
+  const filteredTransactions = activeFilter === 'all'
+    ? transactions
+    : transactions.filter((t) => FILTER_TYPES[activeFilter].includes(t.type));
+
   if (loading) return <LoadingScreen message="Chargement..." />;
 
   const renderItem = ({ item }: { item: Transaction }) => {
@@ -67,6 +90,9 @@ export default function HistoryScreen() {
         <View style={styles.rowInfo}>
           <Text style={styles.rowLabel}>{config.label}</Text>
           <Text style={styles.rowDate}>{formatDate(item.createdAt)}</Text>
+          {item.fee > 0 && (
+            <Text style={styles.rowFee}>Frais : {item.fee.toLocaleString()}F</Text>
+          )}
         </View>
         <Text style={[styles.rowAmount, { color: config.color }]}>
           {config.sign}{item.amount.toLocaleString()}F
@@ -79,14 +105,33 @@ export default function HistoryScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Historique</Text>
 
-      {transactions.length === 0 ? (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterRow}
+        style={styles.filterScroll}
+      >
+        {FILTERS.map((f) => (
+          <TouchableOpacity
+            key={f.key}
+            style={[styles.filterChip, activeFilter === f.key && styles.filterChipActive]}
+            onPress={() => setActiveFilter(f.key)}
+          >
+            <Text style={[styles.filterText, activeFilter === f.key && styles.filterTextActive]}>
+              {f.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {filteredTransactions.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="receipt-outline" size={64} color={COLORS.textSecondary} />
           <Text style={styles.emptyText}>Aucune transaction</Text>
         </View>
       ) : (
         <FlatList
-          data={transactions}
+          data={filteredTransactions}
           keyExtractor={(item, index) => (item as any).id || String(index)}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
@@ -113,8 +158,37 @@ const styles = StyleSheet.create({
     fontFamily: FONT_FAMILY.bold,
     color: COLORS.text,
     marginTop: SPACING.xl,
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.sm,
     paddingHorizontal: SPACING.lg,
+  },
+  filterScroll: {
+    maxHeight: 44,
+    marginBottom: SPACING.md,
+  },
+  filterRow: {
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  filterChip: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  filterChipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  filterText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    fontFamily: FONT_FAMILY.medium,
+  },
+  filterTextActive: {
+    color: COLORS.text,
+    fontWeight: 'bold',
   },
   list: {
     padding: SPACING.lg,
@@ -146,6 +220,12 @@ const styles = StyleSheet.create({
   rowDate: {
     color: COLORS.textSecondary,
     fontSize: 12,
+    fontFamily: FONT_FAMILY.regular,
+    marginTop: 2,
+  },
+  rowFee: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
     fontFamily: FONT_FAMILY.regular,
     marginTop: 2,
   },

@@ -291,6 +291,45 @@ export async function cancelStaleGame(gameId: string, userId: string) {
   return { status: 'cancelled' };
 }
 
+export async function cancelGame(gameId: string, userId: string) {
+  const gameRef = db.collection(GAMES).doc(gameId);
+
+  const result = await db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(gameRef);
+    if (!snap.exists) throw new Error('Partie introuvable.');
+
+    const game = snap.data()!;
+
+    const isPlayer1 = game.player1.userId === userId;
+    const isPlayer2 = game.player2.userId === userId;
+    if (!isPlayer1 && !isPlayer2) {
+      throw new Error('Vous ne participez pas a cette partie.');
+    }
+
+    if (game.status !== 'choosing' && game.status !== 'draw') {
+      throw new Error('Impossible d\'annuler cette partie.');
+    }
+
+    transaction.update(gameRef, {
+      status: 'cancelled',
+      cancelledBy: userId,
+      cancelledAt: new Date(),
+    });
+
+    return {
+      player1Id: game.player1.userId,
+      player2Id: game.player2.userId,
+      betAmount: game.betAmount,
+    };
+  });
+
+  // Refund bet amount (NOT the 10F fee) to both players
+  await refundPlayer(result.player1Id, result.betAmount);
+  await refundPlayer(result.player2Id, result.betAmount);
+
+  return { status: 'cancelled' };
+}
+
 export async function cancelActiveGamesForUser(userId: string) {
   // Find all active games for this user
   const snap1 = await db.collection(GAMES)

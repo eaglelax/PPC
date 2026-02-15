@@ -23,6 +23,8 @@ import {
 } from 'firebase/auth';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RouteProp } from '@react-navigation/native';
 import { auth, GOOGLE_WEB_CLIENT_ID } from '../config/firebase';
 import { sendOtp, verifyOtp, validateReferralCode } from '../config/api';
 import { createUser } from '../services/userService';
@@ -30,6 +32,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { COLORS, FONTS, SPACING, FONT_FAMILY } from '../config/theme';
 import { showAlert } from '../utils/alert';
 import { ORANGE_MONEY_COUNTRIES, DEFAULT_COUNTRY, Country } from '../config/countries';
+import { RootStackParamList } from '../types';
 import GradientButton from '../components/GradientButton';
 import LoadingScreen from '../components/LoadingScreen';
 
@@ -37,7 +40,12 @@ WebBrowser.maybeCompleteAuthSession();
 
 type Step = 'phone' | 'phoneInput' | 'otp' | 'profile';
 
-export default function AuthScreen() {
+type Props = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'Auth'>;
+  route: RouteProp<RootStackParamList, 'Auth'>;
+};
+
+export default function AuthScreen({ navigation, route }: Props) {
   const { needsProfile, firebaseUser } = useAuth();
 
   // Step management
@@ -65,6 +73,9 @@ export default function AuthScreen() {
   const [referralValid, setReferralValid] = useState<boolean | null>(null);
   const [referrerName, setReferrerName] = useState('');
   const [referralChecking, setReferralChecking] = useState(false);
+
+  // Privacy policy
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const referralTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -100,6 +111,13 @@ export default function AuthScreen() {
       }
     }
   }, [needsProfile]);
+
+  // Listen for privacy acceptance from PrivacyPolicyScreen
+  useEffect(() => {
+    if (route.params?.privacyAccepted) {
+      setPrivacyAccepted(true);
+    }
+  }, [route.params?.privacyAccepted]);
 
   // Resend timer countdown
   useEffect(() => {
@@ -355,9 +373,34 @@ export default function AuthScreen() {
               secureTextEntry
             />
 
+            {!isLogin && (
+              <View style={styles.privacyRow}>
+                <TouchableOpacity
+                  style={styles.checkbox}
+                  onPress={() => setPrivacyAccepted(!privacyAccepted)}
+                >
+                  <Ionicons
+                    name={privacyAccepted ? 'checkbox' : 'square-outline'}
+                    size={24}
+                    color={privacyAccepted ? COLORS.primary : COLORS.textSecondary}
+                  />
+                </TouchableOpacity>
+                <Text style={styles.privacyText}>
+                  J'accepte la{' '}
+                  <Text
+                    style={styles.privacyLink}
+                    onPress={() => navigation.navigate('PrivacyPolicy', { fromSignup: true })}
+                  >
+                    Politique de confidentialite
+                  </Text>
+                </Text>
+              </View>
+            )}
+
             <GradientButton
               title={isLogin ? 'Se connecter' : "S'inscrire"}
               onPress={handleEmailAuth}
+              disabled={!isLogin && !privacyAccepted}
             />
 
             {/* Divider */}
@@ -368,7 +411,11 @@ export default function AuthScreen() {
             </View>
 
             {/* Google Sign-In */}
-            <TouchableOpacity style={styles.googleButton} onPress={handleGoogleSignIn}>
+            <TouchableOpacity
+              style={[styles.googleButton, !isLogin && !privacyAccepted && styles.buttonDisabled]}
+              onPress={handleGoogleSignIn}
+              disabled={!isLogin && !privacyAccepted}
+            >
               <Ionicons name="logo-google" size={20} color={COLORS.text} />
               <Text style={styles.googleButtonText}>
                 {isLogin ? 'Se connecter avec Google' : "S'inscrire avec Google"}
@@ -421,9 +468,34 @@ export default function AuthScreen() {
               />
             </View>
 
+            {!isLogin && (
+              <View style={styles.privacyRow}>
+                <TouchableOpacity
+                  style={styles.checkbox}
+                  onPress={() => setPrivacyAccepted(!privacyAccepted)}
+                >
+                  <Ionicons
+                    name={privacyAccepted ? 'checkbox' : 'square-outline'}
+                    size={24}
+                    color={privacyAccepted ? COLORS.primary : COLORS.textSecondary}
+                  />
+                </TouchableOpacity>
+                <Text style={styles.privacyText}>
+                  J'accepte la{' '}
+                  <Text
+                    style={styles.privacyLink}
+                    onPress={() => navigation.navigate('PrivacyPolicy', { fromSignup: true })}
+                  >
+                    Politique de confidentialite
+                  </Text>
+                </Text>
+              </View>
+            )}
+
             <GradientButton
               title={isLogin ? 'Recevoir le code' : "S'inscrire par telephone"}
               onPress={handleSendOtp}
+              disabled={!isLogin && !privacyAccepted}
             />
 
             <TouchableOpacity onPress={() => setStep('phone')}>
@@ -848,5 +920,26 @@ const styles = StyleSheet.create({
   countryItemDial: {
     color: COLORS.textSecondary,
     fontSize: FONTS.regular,
+  },
+  privacyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  checkbox: {
+    padding: 2,
+  },
+  privacyText: {
+    flex: 1,
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    fontFamily: FONT_FAMILY.regular,
+  },
+  privacyLink: {
+    color: COLORS.primary,
+    textDecorationLine: 'underline',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
 });

@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet as RNStyleSheet, Platform } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, Sora_600SemiBold, Sora_700Bold } from '@expo-google-fonts/sora';
 import { Outfit_400Regular, Outfit_500Medium } from '@expo-google-fonts/outfit';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
@@ -18,6 +19,7 @@ import RechargeScreen from './src/screens/RechargeScreen';
 import WithdrawScreen from './src/screens/WithdrawScreen';
 import ReferralScreen from './src/screens/ReferralScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
+import PrivacyPolicyScreen from './src/screens/PrivacyPolicyScreen';
 import { RootStackParamList } from './src/types';
 import { COLORS } from './src/config/theme';
 
@@ -118,9 +120,13 @@ function AppNavigator() {
           <Stack.Screen name="Withdraw" component={WithdrawScreen} />
           <Stack.Screen name="Referral" component={ReferralScreen} />
           <Stack.Screen name="History" component={HistoryScreen} />
+          <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
         </>
       ) : (
-        <Stack.Screen name="Auth" component={AuthScreen} />
+        <>
+          <Stack.Screen name="Auth" component={AuthScreen} />
+          <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+        </>
       )}
     </Stack.Navigator>
   );
@@ -190,6 +196,7 @@ export default function App() {
   }
 
   return (
+    <SafeAreaProvider>
     <ErrorBoundary>
       <AuthProvider>
         <NavigationContainer>
@@ -204,5 +211,6 @@ export default function App() {
         />
       )}
     </ErrorBoundary>
+    </SafeAreaProvider>
   );
 }
